@@ -1028,6 +1028,25 @@ Compare model output manually against visible labels:
 
 Track extraction errors.
 
+## Recorded Decisions
+
+- Transport: server-side `fetch` to `POST https://openrouter.ai/api/v1/chat/completions` (no provider SDK, no direct provider calls). Per current OpenRouter docs: text-first user content + `image_url` data-URL parts, `response_format.type=json_schema` with `strict:true`, `provider.require_parameters:true`, optional server-only `HTTP-Referer`/`X-Title`.
+- Model: `google/gemini-2.5-flash-lite`, verified 2026-09-03 against live OpenRouter model metadata for image input + `structured_outputs`/`response_format` support at $0.10/$0.40 per MTok. Slug lives in server-only `OPENROUTER_ANALYSIS_MODEL` with the verified slug as in-code fallback — changeable without client or schema changes.
+- Single contract end-to-end: wire schema derived via `z.toJSONSchema(ProductAnalysisSchema)` (`src/lib/analysis/responseSchema.ts`), so the `response_format` can never drift from local Zod validation.
+- Prompt (`src/lib/analysis/prompt.ts`): system rules cover all 11 contract points (label-beats-database, never invent, per-serving vs per-100g, sodium vs salt, declared vs traces, factual additive functions, non-medical verdicts, `insufficient_data` on weak evidence, structured-output-only). OFF data sent as a truncated sanitized summary (≤4KB), never raw unlimited text.
+- Gateway (`src/lib/analysis/openrouter.ts`, server-only): single attempt, typed errors (unauthorized/rate_limited/transient/bad_request/invalid_json), fence-tolerant JSON extraction. Retry policy lives in `src/lib/analysis/service.ts`: exactly one retry, only for schema failures and transient errors — 429/401 never retry, attempt count returned for audit.
+- Deterministic post-processing in code: 2-decimal rounding, allergen/additive/bullet list trim + case-insensitive dedupe, standard disclaimer enforced. Verdicts and facts untouched.
+- Route mapping: unauthorized→503, rate_limited→429, schema failure→500, transient→503 — all UI-safe, no provider internals leaked. `mock.ts` retained for unit tests only; the route now calls the live gateway.
+- Server-only surface verified by grep: only `analyze+api.ts` imports `openrouter`/`service`; key referenced only in the route; dummy key ABSENT from the production client bundle.
+
+## Step Status
+
+Implementation complete on 2026-09-03. Verified without spending: prompt-directive checks, derived-schema structural checks (13 required, closed objects, enums intact), deterministic-fix checks, 8 stubbed-gateway scenarios with audited attempt counts (valid→1; flaky JSON/500 heal on retry→2; garbage/500-twice→controlled errors with exactly 2 hits; 429/401→1 hit, no retry; fence-wrapped JSON parses; Bearer/model/strict/require_parameters/text-first all confirmed on the wire), live route with dummy key (real gateway 401→controlled 503, validation intact, logs sanitized), strict TypeScript, ESLint clean, Expo Doctor 21/21, production export with secret-free client bundle.
+
+## Blocker
+
+The 10-label live evaluation dataset requires a funded `OPENROUTER_API_KEY` from the repository owner — no paid inference was run from this machine. To pass the gate: set the key (and optionally `OPENROUTER_ANALYSIS_MODEL`) in server-only env, POST the 10+ real label photos through `/api/analyze`, and record per-field accuracy (calories, serving, sugar, protein, sodium/salt, ingredients, allergens) plus uncertainty handling in a local QA sheet (not a user database).
+
 ## Gate
 
 Step 9 passes only when the AI consistently returns validated, evidence-grounded results on the test set.

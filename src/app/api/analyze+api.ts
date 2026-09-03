@@ -1,24 +1,18 @@
-import { mockAnalysis } from '@/lib/analysis/mock';
-import { normalizeProductAnalysis } from '@/lib/analysis/normalize';
+import { DEFAULT_ANALYSIS_MODEL } from '@/lib/analysis/openrouter';
 import { ANALYZE_MAX_BODY_BYTES, validateAnalyzeRequest } from '@/lib/analysis/request';
+import { analyzeScan } from '@/lib/analysis/service';
 
 /**
  * Stateless analysis endpoint. No authentication, no database, no persistence.
  *
  * POST /api/analyze
- *   validate request → check server config → mock analysis service (Step 9
- *   replaces this with OpenRouter structured analysis) → runtime-validate
- *   model output → return normalized JSON.
+ *   validate request → check server config → OpenRouter structured analysis
+ *   (one controlled retry) → runtime-validate model output → deterministic
+ *   fixes → return normalized JSON.
  *
  * Success responses are the `ProductAnalysis` object directly; errors are
  * `{ error: { code, message } }` with non-technical, UI-safe messages.
  */
-
-// Server-side gateway constant for Step 9. Never accept a gateway URL from
-// the mobile request, and never expose this file's env access to the client.
-const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
-
-const ANALYSIS_TIMEOUT_MS = Number(process.env.ANALYSIS_TIMEOUT_MS ?? 30000);
 
 type LogFields = {
   requestId: string;
@@ -110,11 +104,11 @@ export async function POST(request: Request): Promise<Response> {
       });
     }
 
-    // Server-only key. Missing key is a controlled 503, never a stack trace.
-    // `OPENROUTER_BASE_URL` + `ANALYSIS_TIMEOUT_MS` are staged here for Step 9.
-    void OPENROUTER_BASE_URL;
-    void ANALYSIS_TIMEOUT_MS;
-    if (!process.env.OPENROUTER_API_KEY) {
+    // Server-only key and model. Missing key is a controlled 503, never a
+    // stack trace. The model slug stays overrideable via server-only env so
+    // the app never couples to one forever-fixed model.
+    const apiKey = process.env.OPENROUTER_API_KEY;
+    if (!apiKey) {
       return errorResponse(503, 'server_unavailable', 'Analysis is temporarily unavailable. Try again later.', {
         ...base,
         elapsedMs: Date.now() - started,
@@ -122,11 +116,47 @@ export async function POST(request: Request): Promise<Response> {
         barcodePresent: Boolean(validated.request.barcode),
       });
     }
+    const timeoutRaw = Number(process.env.ANALYSIS_TIMEOUT_MS ?? 30000);
+    const timeoutMs = Number.isFinite(timeoutRaw) && timeoutRaw > 0 ? Math.min(timeoutRaw, 120000) : 30000;
 
-    const mocked = mockAnalysis(validated.request);
-    const normalized = normalizeProductAnalysis(mocked);
-    if (!normalized.ok) {
-      return errorResponse(500, 'invalid_result', 'Analysis failed validation. Try again later.', {
+    const result = await analyzeScan(validated.request, {
+      apiKey,
+      model: process.env.OPENROUTER_ANALYSIS_MODEL ?? DEFAULT_ANALYSIS_MODEL,
+      ...(process.env.OPENROUTER_SITE_URL ? { siteUrl: process.env.OPENROUTER_SITE_URL } : {}),
+      appName: process.env.OPENROUTER_APP_NAME ?? 'ScanLabel',
+      timeoutMs,
+    });
+    if (!result.ok) {
+      if (result.error.code === 'rate_limited') {
+        return errorResponse(429, 'rate_limited', 'Too many analyses right now. Wait a moment and try again.', {
+          ...base,
+          elapsedMs: Date.now() - started,
+          imageCount: validated.request.images.length,
+          barcodePresent: Boolean(validated.request.barcode),
+        });
+      }
+      if (result.error.code === 'provider_unauthorized') {
+        return errorResponse(
+          503,
+          'server_unavailable',
+          'Analysis is temporarily unavailable. Try again later.',
+          {
+            ...base,
+            elapsedMs: Date.now() - started,
+            imageCount: validated.request.images.length,
+            barcodePresent: Boolean(validated.request.barcode),
+          },
+        );
+      }
+      if (result.error.code === 'invalid_result') {
+        return errorResponse(500, 'invalid_result', 'Analysis failed validation. Try again later.', {
+          ...base,
+          elapsedMs: Date.now() - started,
+          imageCount: validated.request.images.length,
+          barcodePresent: Boolean(validated.request.barcode),
+        });
+      }
+      return errorResponse(503, 'provider_unavailable', 'Analysis is temporarily unavailable. Try again later.', {
         ...base,
         elapsedMs: Date.now() - started,
         imageCount: validated.request.images.length,
@@ -138,11 +168,11 @@ export async function POST(request: Request): Promise<Response> {
       ...base,
       elapsedMs: Date.now() - started,
       status: 200,
-      source: normalized.data.source,
+      source: result.analysis.source,
       imageCount: validated.request.images.length,
       barcodePresent: Boolean(validated.request.barcode),
     });
-    return Response.json(normalized.data, { status: 200 });
+    return Response.json(result.analysis, { status: 200 });
   } catch {
     return errorResponse(500, 'internal_error', 'Something went wrong. Try again later.', {
       ...base,
