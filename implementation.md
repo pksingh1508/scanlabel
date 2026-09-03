@@ -1150,6 +1150,24 @@ Test every path without manually modifying state.
 - [ ] reset
 - [ ] scan another different product
 
+## Recorded Decisions
+
+- Explicit flow machine `src/state/scan-flow.ts` (pure reducer: idle/scanning/barcode_lookup/needs_label/capturing_label/preparing_images/analyzing/result/error) held in scan context alongside session/analysis/error. Local card/preview states remain for display detail only.
+- Single analysis entry: `analyzing.tsx` serves all four paths (OFF-only, OFF+images, barcode+images, images-only), runs once per attempt with unmount abort, replaces to `/result` on success. Error UI offers Try again (same payload) + Start over (full reset). Cancel aborts and goes back for retake.
+- Body assembly `src/lib/analysis/requestBody.ts` (injectable file reader): prepared files → base64 sequentially, per-image cap enforced pre-network, empty session rejected without calling the server.
+- File reading via `expo-file-system` `File.uri.base64()` (`src/lib/image/readAsBase64.ts`), the only new native dependency.
+- `requestAnalysis` gained an optional external abort signal (additive; cancel maps to a benign message callers ignore via mounted checks).
+- Scanner: barcode lock dispatches flow transitions; complete lookups gained an explicit Analyze button (OFF-only body skips photos); reset restores scanning phase.
+- `result.tsx` renders `session.analysis` when present (source badge replaces DEMO badge); demo fixture remains only as the no-analysis fallback until Step 11 rebuilds the screen. "Scan another" calls full `resetScan()` (barcode, OFF, images, analysis, error, flow) before returning home, where the focus effect unlocks the scanner.
+
+## Step Status
+
+Implementation complete on 2026-09-03. Verified without device/key: 19/19 unit checks (all flow transitions incl. RESET from every phase; OFF-only/image-ordered/combined bodies; empty/unreadable/oversized rejected pre-network), live dev-server OFF-only pipeline body → controlled 503, strict TypeScript, ESLint clean, Expo Doctor 21/21, web + API-route production export, secret/file-system import surface clean.
+
+## Blocker
+
+The 8-path UI walkthrough needs a physical device AND a funded `OPENROUTER_API_KEY` (Step 9 gate): complete/incomplete/unknown barcode, direct label, retake, server error, reset, and scan-another must be exercised end-to-end on real hardware with live analysis. Combine with the Step 13 real-label matrix.
+
 ## Gate
 
 Step 10 passes when the app behaves like one coherent product, not separate demos.

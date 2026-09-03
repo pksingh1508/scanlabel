@@ -30,6 +30,8 @@ export type RequestAnalysisOptions = {
   timeoutMs?: number;
   /** Absolute URL in tests; relative endpoint on device. */
   endpoint?: string;
+  /** External abort (e.g. user leaves the analyzing screen). Never throws. */
+  signal?: AbortSignal;
 };
 
 function safeServerMessage(value: unknown): string | null {
@@ -66,6 +68,21 @@ export async function requestAnalysis(
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const externalSignal = options?.signal;
+  const forwardAbort = () => controller.abort();
+  // An externally-aborted request is user-cancelled: callers ignore the
+  // result via their own mounted checks, so any safe mapping works here.
+  const externallyAborted = () => externalSignal?.aborted === true;
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      clearTimeout(timeout);
+      return {
+        ok: false,
+        error: { code: 'timeout', message: 'Analysis was cancelled.' },
+      };
+    }
+    externalSignal.addEventListener('abort', forwardAbort, { once: true });
+  }
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -114,6 +131,12 @@ export async function requestAnalysis(
   } catch (error) {
     const name = typeof error === 'object' && error !== null ? (error as { name?: unknown }).name : null;
     if (name === 'AbortError' || name === 'TimeoutError') {
+      if (externallyAborted()) {
+        return {
+          ok: false,
+          error: { code: 'timeout', message: 'Analysis was cancelled.' },
+        };
+      }
       return {
         ok: false,
         error: { code: 'timeout', message: 'Analysis took too long. Check your connection and try again.' },
@@ -128,5 +151,6 @@ export async function requestAnalysis(
     };
   } finally {
     clearTimeout(timeout);
+    externalSignal?.removeEventListener('abort', forwardAbort);
   }
 }

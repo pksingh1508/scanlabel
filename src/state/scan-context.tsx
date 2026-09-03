@@ -1,6 +1,23 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useMemo,
+  useReducer,
+  useState,
+  type ReactNode,
+} from 'react';
 
+import type { AnalysisClientError } from '@/lib/analysis/client';
 import type { NormalizedOffProduct } from '@/lib/open-food-facts/types';
+import type { ProductAnalysis } from '@/types/analysis';
+
+import {
+  INITIAL_FLOW,
+  scanFlowReducer,
+  type ScanFlowAction,
+  type ScanFlowState,
+} from './scan-flow';
 
 export const MAX_SCAN_IMAGES = 2;
 
@@ -20,8 +37,9 @@ export type ScanImage = {
 };
 
 /**
- * Temporary in-memory session for the current scan only.
- * No persistence, no history. Cleared on cancel, reset, or starting a new scan.
+ * Temporary in-memory state for the current scan only.
+ * No persistence, no history. `resetScan` clears everything (barcode, OFF
+ * product, images, analysis, error) for "Scan another".
  */
 export type ScanSession = {
   barcode?: string;
@@ -31,11 +49,22 @@ export type ScanSession = {
 
 type ScanContextValue = {
   session: ScanSession;
+  flow: ScanFlowState;
+  analysis: ProductAnalysis | null;
+  analysisError: AnalysisClientError | null;
   setBarcodeData: (barcode: string | undefined, offProduct: NormalizedOffProduct | undefined) => void;
   addImage: (image: ScanImage) => boolean;
   removeImage: (index: number) => void;
   clearImages: () => void;
+  /** Clears session images only (capture cancel); barcode context survives. */
   clearSession: () => void;
+  /** Coarse pipeline phase transitions (see scan-flow.ts). */
+  updateFlow: (action: ScanFlowAction) => void;
+  setAnalysisResult: (analysis: ProductAnalysis) => void;
+  setAnalysisFailure: (error: AnalysisClientError) => void;
+  clearAnalysisError: () => void;
+  /** Full reset for "Scan another": data, analysis, error, and flow. */
+  resetScan: () => void;
 };
 
 const ScanContext = createContext<ScanContextValue | null>(null);
@@ -44,6 +73,9 @@ const EMPTY_SESSION: ScanSession = { images: [] };
 
 export function ScanProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<ScanSession>(EMPTY_SESSION);
+  const [flow, dispatchFlow] = useReducer(scanFlowReducer, INITIAL_FLOW);
+  const [analysis, setAnalysis] = useState<ProductAnalysis | null>(null);
+  const [analysisError, setAnalysisError] = useState<AnalysisClientError | null>(null);
 
   const setBarcodeData = useCallback(
     (barcode: string | undefined, offProduct: NormalizedOffProduct | undefined) => {
@@ -79,9 +111,66 @@ export function ScanProvider({ children }: { children: ReactNode }) {
     setSession(EMPTY_SESSION);
   }, []);
 
+  const updateFlow = useCallback((action: ScanFlowAction) => {
+    dispatchFlow(action);
+  }, []);
+
+  const setAnalysisResult = useCallback((next: ProductAnalysis) => {
+    setAnalysisError(null);
+    setAnalysis(next);
+    dispatchFlow({ type: 'ANALYZE_SUCCESS' });
+  }, []);
+
+  const setAnalysisFailure = useCallback((error: AnalysisClientError) => {
+    setAnalysis(null);
+    setAnalysisError(error);
+    dispatchFlow({ type: 'ANALYZE_FAILURE' });
+  }, []);
+
+  const clearAnalysisError = useCallback(() => {
+    setAnalysisError(null);
+  }, []);
+
+  const resetScan = useCallback(() => {
+    setSession(EMPTY_SESSION);
+    setAnalysis(null);
+    setAnalysisError(null);
+    dispatchFlow({ type: 'RESET' });
+  }, []);
+
   const value = useMemo(
-    () => ({ session, setBarcodeData, addImage, removeImage, clearImages, clearSession }),
-    [session, setBarcodeData, addImage, removeImage, clearImages, clearSession],
+    () => ({
+      session,
+      flow,
+      analysis,
+      analysisError,
+      setBarcodeData,
+      addImage,
+      removeImage,
+      clearImages,
+      clearSession,
+      updateFlow,
+      setAnalysisResult,
+      setAnalysisFailure,
+      clearAnalysisError,
+      resetScan,
+    }),
+    [
+      session,
+      flow,
+      analysis,
+      analysisError,
+      setBarcodeData,
+      addImage,
+      removeImage,
+      clearImages,
+      clearSession,
+      updateFlow,
+      setAnalysisResult,
+      setAnalysisFailure,
+      clearAnalysisError,
+      resetScan,
+    ],
   );
 
   return <ScanContext.Provider value={value}>{children}</ScanContext.Provider>;

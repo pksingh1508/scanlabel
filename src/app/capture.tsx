@@ -36,7 +36,7 @@ function kindLabel(kind: ScanImageKind): string {
 export default function CaptureScreen() {
   const { colors } = useAppTheme();
   const isFocused = useIsFocused();
-  const { session, addImage, removeImage, clearImages } = useScan();
+  const { session, addImage, removeImage, clearImages, updateFlow } = useScan();
 
   const [permission, requestPermission, refreshPermission] = useCameraPermissions();
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
@@ -58,6 +58,10 @@ export default function CaptureScreen() {
   const nextKind: ScanImageKind = confirmedCount === 0 ? 'ingredients' : 'nutrition';
   const showCamera = cameraActive && !pendingPreview && canCaptureMore;
   const canContinue = confirmedCount >= 1 && !pendingPreview && !isCapturing && !isPreparing;
+
+  useEffect(() => {
+    updateFlow({ type: 'ENTER_CAPTURE' });
+  }, [updateFlow]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -113,6 +117,7 @@ export default function CaptureScreen() {
     if (!pendingPreview || isPreparing) return;
     setIsPreparing(true);
     setCaptureError(null);
+    updateFlow({ type: 'PREPARE_START' });
     void prepareLabelImage(pendingPreview.uri, {
       sourceWidth: pendingPreview.width,
       sourceHeight: pendingPreview.height,
@@ -147,8 +152,9 @@ export default function CaptureScreen() {
       })
       .finally(() => {
         setIsPreparing(false);
+        updateFlow({ type: 'PREPARE_DONE' });
       });
-  }, [pendingPreview, isPreparing, addImage, nextKind]);
+  }, [pendingPreview, isPreparing, addImage, nextKind, updateFlow]);
 
   const handleCancel = useCallback(() => {
     if (isPreparing) return;

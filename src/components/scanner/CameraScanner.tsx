@@ -85,7 +85,7 @@ function CameraMessage({
 export function CameraScanner() {
   const { colors } = useAppTheme();
   const isFocused = useIsFocused();
-  const { setBarcodeData } = useScan();
+  const { setBarcodeData, updateFlow } = useScan();
   const [permission, requestPermission, refreshPermission] = useCameraPermissions();
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
   const [torchEnabled, setTorchEnabled] = useState(false);
@@ -106,7 +106,8 @@ export function CameraScanner() {
     setDetectedBarcode(null);
     setLookup({ status: 'idle' });
     setBarcodeData(undefined, undefined);
-  }, [setBarcodeData]);
+    updateFlow({ type: 'FOCUS_SCANNER' });
+  }, [setBarcodeData, updateFlow]);
 
   const runLookup = useCallback(
     (barcode: string) => {
@@ -121,9 +122,11 @@ export function CameraScanner() {
             if (result.error.kind === 'not_found') {
               setBarcodeData(barcode, undefined);
               setLookup({ status: 'not_found', barcode });
+              updateFlow({ type: 'RESOLVE_LOOKUP', outcome: 'not_found' });
               return;
             }
             setLookup({ status: 'error', message: result.error.userMessage });
+            updateFlow({ type: 'RESOLVE_LOOKUP', outcome: 'error' });
             return;
           }
 
@@ -131,14 +134,18 @@ export function CameraScanner() {
           if (completeness.status === 'complete') {
             setBarcodeData(barcode, result.product);
             setLookup({ status: 'complete', product: result.product, completeness });
+            updateFlow({ type: 'RESOLVE_LOOKUP', outcome: 'complete' });
           } else if (completeness.status === 'needs_label') {
             setBarcodeData(barcode, result.product);
             setLookup({ status: 'needs_label', product: result.product, missing: completeness.missing });
+            updateFlow({ type: 'RESOLVE_LOOKUP', outcome: 'needs_label' });
           } else if (completeness.status === 'not_food') {
             setLookup({ status: 'not_food', reason: completeness.reason });
+            updateFlow({ type: 'RESOLVE_LOOKUP', outcome: 'not_food' });
           } else {
             setBarcodeData(barcode, undefined);
             setLookup({ status: 'not_found', barcode });
+            updateFlow({ type: 'RESOLVE_LOOKUP', outcome: 'not_found' });
           }
         })
         .catch(() => {
@@ -147,9 +154,10 @@ export function CameraScanner() {
             status: 'error',
             message: 'The food database is unavailable right now. Try again or scan the label.',
           });
+          updateFlow({ type: 'RESOLVE_LOOKUP', outcome: 'error' });
         });
     },
-    [setBarcodeData],
+    [setBarcodeData, updateFlow],
   );
 
   useEffect(() => {
@@ -193,9 +201,10 @@ export function CameraScanner() {
       }
 
       setDetectedBarcode({ data, type: result.type });
+      updateFlow({ type: 'LOCK_BARCODE' });
       runLookup(data);
     },
-    [runLookup],
+    [runLookup, updateFlow],
   );
 
   const retryLookup = useCallback(() => {
@@ -409,6 +418,14 @@ export function CameraScanner() {
           <View style={styles.lookupActions}>
             {lookup.status === 'error' ? (
               <Button onPress={retryLookup} size="compact" title="Try again" variant="secondary" />
+            ) : null}
+            {lookup.status === 'complete' ? (
+              <Button
+                accessibilityHint="Analyzes this product from its database data"
+                onPress={() => router.push('/analyzing')}
+                size="compact"
+                title="Analyze"
+              />
             ) : null}
             {lookup.status === 'complete' ||
             lookup.status === 'needs_label' ||
