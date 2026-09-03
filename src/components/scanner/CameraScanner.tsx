@@ -14,9 +14,15 @@ import {
   type BarcodeScanningResult,
   type BarcodeType,
 } from 'expo-camera';
-import { useIsFocused } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 
 import { BarcodeScanLock } from '@/lib/barcode/scan-lock';
+import { fetchOffProduct } from '@/lib/open-food-facts/client';
+import { evaluateProductCompleteness } from '@/lib/open-food-facts/normalize';
+import type {
+  NormalizedOffProduct,
+  ProductCompleteness,
+} from '@/lib/open-food-facts/types';
 import { layout, radius, spacing, useAppTheme } from '@/theme';
 
 import { Button } from '../ui/Button';
@@ -29,6 +35,15 @@ type DetectedBarcode = {
   data: string;
   type: string;
 };
+
+type LookupState =
+  | { status: 'idle' }
+  | { status: 'loading'; barcode: string }
+  | { status: 'complete'; product: NormalizedOffProduct; completeness: ProductCompleteness }
+  | { status: 'needs_label'; product: NormalizedOffProduct; missing: string[] }
+  | { status: 'not_found'; barcode: string }
+  | { status: 'not_food'; reason: string }
+  | { status: 'error'; message: string };
 
 type CameraFailure = 'permission_request' | 'camera_mount' | null;
 
@@ -76,14 +91,55 @@ export function CameraScanner() {
   const [cameraFailure, setCameraFailure] = useState<CameraFailure>(null);
   const [cameraSession, setCameraSession] = useState(0);
   const [detectedBarcode, setDetectedBarcode] = useState<DetectedBarcode | null>(null);
+  const [lookup, setLookup] = useState<LookupState>({ status: 'idle' });
   const scanLock = useRef(new BarcodeScanLock());
   const autoRequestAttempted = useRef(false);
   const previouslyFocused = useRef(isFocused);
+  const lookupRequestId = useRef(0);
   const cameraActive = isFocused && appState === 'active';
 
   const resetScanner = useCallback(() => {
+    lookupRequestId.current += 1;
     scanLock.current.reset();
     setDetectedBarcode(null);
+    setLookup({ status: 'idle' });
+  }, []);
+
+  const runLookup = useCallback((barcode: string) => {
+    const requestId = lookupRequestId.current + 1;
+    lookupRequestId.current = requestId;
+    setLookup({ status: 'loading', barcode });
+
+    void fetchOffProduct(barcode)
+      .then((result) => {
+        if (lookupRequestId.current !== requestId) return;
+        if (result.kind === 'error') {
+          if (result.error.kind === 'not_found') {
+            setLookup({ status: 'not_found', barcode });
+            return;
+          }
+          setLookup({ status: 'error', message: result.error.userMessage });
+          return;
+        }
+
+        const completeness = evaluateProductCompleteness(result.product);
+        if (completeness.status === 'complete') {
+          setLookup({ status: 'complete', product: result.product, completeness });
+        } else if (completeness.status === 'needs_label') {
+          setLookup({ status: 'needs_label', product: result.product, missing: completeness.missing });
+        } else if (completeness.status === 'not_food') {
+          setLookup({ status: 'not_food', reason: completeness.reason });
+        } else {
+          setLookup({ status: 'not_found', barcode });
+        }
+      })
+      .catch(() => {
+        if (lookupRequestId.current !== requestId) return;
+        setLookup({
+          status: 'error',
+          message: 'The food database is unavailable right now. Try again or scan the label.',
+        });
+      });
   }, []);
 
   useEffect(() => {
@@ -118,15 +174,25 @@ export function CameraScanner() {
     }
   }, [isFocused, permission?.status, requestPermission]);
 
-  const handleBarcodeScanned = useCallback((result: BarcodeScanningResult) => {
-    const data = result.data.trim();
+  const handleBarcodeScanned = useCallback(
+    (result: BarcodeScanningResult) => {
+      const data = result.data.trim();
 
-    if (!data || !scanLock.current.tryLock()) {
-      return;
+      if (!data || !scanLock.current.tryLock()) {
+        return;
+      }
+
+      setDetectedBarcode({ data, type: result.type });
+      runLookup(data);
+    },
+    [runLookup],
+  );
+
+  const retryLookup = useCallback(() => {
+    if (detectedBarcode) {
+      runLookup(detectedBarcode.data);
     }
-
-    setDetectedBarcode({ data, type: result.type });
-  }, []);
+  }, [detectedBarcode, runLookup]);
 
   const retryPermission = useCallback(() => {
     setCameraFailure(null);
@@ -266,10 +332,90 @@ export function CameraScanner() {
           <ThemedText muted>
             {detectedBarcode.data} · {detectedBarcode.type.toUpperCase()}
           </ThemedText>
+
+          {lookup.status === 'loading' ? (
+            <View style={styles.lookupRow}>
+              <ActivityIndicator accessibilityLabel="Looking up barcode" />
+              <ThemedText muted variant="caption">
+                Looking up this barcode in the food database. One request per scan.
+              </ThemedText>
+            </View>
+          ) : null}
+
+          {lookup.status === 'complete' ? (
+            <View style={styles.lookupDetails}>
+              <ThemedText variant="bodyStrong">
+                {[lookup.product.productName, lookup.product.brand].filter(Boolean).join(' · ') ||
+                  'Product found'}
+              </ThemedText>
+              <ThemedText muted variant="caption">
+                {[
+                  lookup.product.servingSize ? `Serving: ${lookup.product.servingSize}` : null,
+                  lookup.product.ingredientsText || lookup.product.ingredients.length > 0
+                    ? `${lookup.product.ingredients.length || 'Some'} ingredients listed`
+                    : null,
+                  `${Object.keys(lookup.product.nutriments).length} nutrition values`,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </ThemedText>
+              <ThemedText muted variant="caption">
+                Data ready. Full AI analysis arrives in a later step; no analysis is run yet.
+              </ThemedText>
+            </View>
+          ) : null}
+
+          {lookup.status === 'needs_label' ? (
+            <View style={styles.lookupDetails}>
+              <ThemedText variant="bodyStrong">
+                {lookup.product.productName || lookup.product.brand || 'Product found, but incomplete'}
+              </ThemedText>
+              <ThemedText muted variant="caption">
+                We found the product, but the nutrition information is incomplete
+                {lookup.missing.length ? ` (missing: ${lookup.missing.join(', ')})` : ''}. Scan the
+                nutrition panel.
+              </ThemedText>
+            </View>
+          ) : null}
+
+          {lookup.status === 'not_found' ? (
+            <ThemedText muted variant="caption">
+              This barcode isn&apos;t in our food data yet. Scan the label instead.
+            </ThemedText>
+          ) : null}
+
+          {lookup.status === 'not_food' ? (
+            <ThemedText muted variant="caption">
+              {lookup.reason} This scanner covers packaged food and drinks only.
+            </ThemedText>
+          ) : null}
+
+          {lookup.status === 'error' ? (
+            <ThemedText muted variant="caption">
+              {lookup.message}
+            </ThemedText>
+          ) : null}
+
+          <View style={styles.lookupActions}>
+            {lookup.status === 'error' ? (
+              <Button onPress={retryLookup} size="compact" title="Try again" variant="secondary" />
+            ) : null}
+            {lookup.status === 'complete' ||
+            lookup.status === 'needs_label' ||
+            lookup.status === 'not_found' ||
+            lookup.status === 'error' ? (
+              <Button
+                accessibilityHint="Opens the label photo screen"
+                onPress={() => router.push('/capture')}
+                size="compact"
+                title="Scan label"
+              />
+            ) : null}
+            <Button onPress={resetScanner} size="compact" title="Scan again" variant="quiet" />
+          </View>
           <ThemedText muted variant="caption">
-            Product lookup will be connected in Step 4. Scanning is locked to prevent duplicate requests.
+            Scanning stays locked until you scan again or return to this screen.
           </ThemedText>
-          <Button onPress={resetScanner} size="compact" title="Scan again" variant="secondary" />
         </Card>
       ) : null}
     </View>
@@ -328,5 +474,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     position: 'absolute',
     right: layout.cameraControlInset,
+  },
+  lookupRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  lookupDetails: {
+    gap: spacing.xs,
+  },
+  lookupActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
 });

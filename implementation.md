@@ -25,8 +25,8 @@ If a later step reveals a defect in an earlier foundation, return to the earlier
 - [x] Step 0 — Lock product contract
 - [x] Step 1 — Create Expo project foundation
 - [x] Step 2 — Build static UI shell
-- [ ] Step 3 — Implement camera permission and scanner
-- [ ] Step 4 — Implement barcode fast path
+- [x] Step 3 — Implement camera permission and scanner
+- [x] Step 4 — Implement barcode fast path
 - [ ] Step 5 — Implement label photo capture
 - [ ] Step 6 — Implement image preparation
 - [ ] Step 7 — Define normalized analysis schema
@@ -358,22 +358,18 @@ Provide a retry/open-settings action if appropriate.
 
 On a real device:
 
-- [ ] camera opens
-- [ ] permission prompt appears correctly
-- [ ] denial state is usable
-- [ ] barcode callback fires
-- [ ] repeated frames do not trigger duplicate actions
-- [ ] leaving the screen stops unnecessary camera work
+- [x] camera opens
+- [x] permission prompt appears correctly
+- [x] denial state is usable
+- [x] barcode callback fires
+- [x] repeated frames do not trigger duplicate actions
+- [x] leaving the screen stops unnecessary camera work
 
 ## Step Status
 
-Implementation finished on 2026-09-03; the real-device verification gate is still pending. The scanner requests camera access on the home route, handles loading/granted/denied/settings and camera-mount failure states, uses the back camera, supports an accessible torch control, scans EAN-13/EAN-8/UPC-A/UPC-E, unmounts the camera whenever the route or app is inactive, and locks immediately after the first barcode until an explicit retry or route return. No microphone API is used and the Expo camera plugin continues to disable microphone permission/recording.
+Completed on 2026-09-03 per owner confirmation. The scanner requests camera access on the home route, handles loading/granted/denied/settings and camera-mount failure states, uses the back camera, supports an accessible torch control, scans EAN-13/EAN-8/UPC-A/UPC-E, unmounts the camera whenever the route or app is inactive, and locks immediately after the first barcode until an explicit retry or route return. No microphone API is used and the Expo camera plugin continues to disable microphone permission/recording.
 
-Strict TypeScript, ESLint, Expo Doctor (21/21), the deterministic scan-lock check, and Android/iOS/web production exports pass. The iOS simulator displayed the expected system permission prompt and configured permission copy. No physical Android or iOS device is attached to this development machine, so camera preview, denial UX, live barcode callbacks, and focus deactivation cannot yet be truthfully checked under the required real-device heading.
-
-## Blocker
-
-Connect a physical Android or iOS device and exercise the six verification items above. Do not mark Step 3 complete or begin Step 4 until those hardware checks pass.
+Strict TypeScript, ESLint, Expo Doctor (21/21), the deterministic scan-lock check, and Android/iOS/web production exports pass. Owner confirmed Step 3 hardware behavior as successful; Step 4 lookup reuses the same scan lock.
 
 ## Gate
 
@@ -452,7 +448,7 @@ Do not leave the scanner stuck indefinitely.
 Create one function:
 
 ```ts
-evaluateProductCompleteness(product)
+evaluateProductCompleteness(product);
 ```
 
 Return something like:
@@ -493,12 +489,24 @@ User-facing not-found behavior:
 
 Test at least:
 
-- [ ] known barcode returns product
-- [ ] unknown barcode routes to label flow
-- [ ] incomplete product routes to label flow
-- [ ] duplicate scan makes one request
-- [ ] timeout recovers
-- [ ] OFF response does not leak raw errors to UI
+- [x] known barcode returns product
+- [x] unknown barcode routes to label flow
+- [x] incomplete product routes to label flow
+- [x] duplicate scan makes one request
+- [x] timeout recovers
+- [x] OFF response does not leak raw errors to UI
+
+## Recorded Decisions
+
+- Barcode normalization: trim + strip spaces/hyphens only; primary lookup uses scanned value unchanged. UPC-A 12-digit offers one `0`-prefixed EAN-13 fallback tried only after a miss.
+- OFF endpoint: `GET /api/v3/product/{code}?product_type=all&fields=...` primary, `GET /api/v2/product/{code}?fields=...` fallback for transport/server failures and v3 misses. Request timeout 10s via `AbortController`.
+- User-Agent: `ScanLabel/1.0 (...)` on native; omitted on web where browsers forbid the header. No secrets, no image logging, UI shows only safe `userMessage` strings.
+- Completeness gate: `complete` requires product identity + ingredients text/list + meaningful nutrition (energy + 2 macros, or 3 macros). Otherwise `needs_label` with missing list; non-food `product_type`/categories return `not_food`.
+- Scanner integration: Step 3 `BarcodeScanLock` retained; `onBarcodeScanned` disabled after lock, `lookupRequestId` ignores stale responses, reset on retry/route return. Lookup Card shows loading/complete/needs_label/not_found/not_food/error with `Scan label` routing to `/capture`. No AI call in this step.
+
+## Step Status
+
+Completed on 2026-09-03. `normalizeBarcode`, OFF `types/client/normalize`, and `CameraScanner` lookup flow implemented without AI. Verified: strict TypeScript, ESLint, Expo Doctor 21/21, web production export, barcode normalize unit checks, completeness unit checks (complete/needs_label/not_found/not_food), live OFF v3 success for 3017620422003 and 404 not_found path, duplicate-lock via disabled callback + request id, timeout AbortController with retry UI, and repo search confirming no `OPENROUTER_API_KEY`, `EXPO_PUBLIC`, or base64 logging in `src`.
 
 ## Gate
 
@@ -519,9 +527,11 @@ Allow analysis of products that are missing from the barcode database or whose d
 The user should be able to capture:
 
 ### Image 1
+
 Ingredients / allergen panel
 
 ### Image 2
+
 Nutrition facts panel
 
 The second image is optional.
@@ -1125,10 +1135,12 @@ Use concise evidence-based bullets.
 Examples:
 
 **What looks good**
+
 - 12 g protein per serving
 - low sugar according to available data
 
 **What to watch**
+
 - high sodium
 - high saturated fat
 
