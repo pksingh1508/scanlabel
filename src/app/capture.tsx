@@ -10,7 +10,7 @@ import {
   type AppStateStatus,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { router, useIsFocused } from 'expo-router';
+import { router, useFocusEffect, useIsFocused } from 'expo-router';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -46,6 +46,7 @@ export default function CaptureScreen() {
   const [cameraSession, setCameraSession] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isPreparing, setIsPreparing] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [pendingPreview, setPendingPreview] = useState<PendingPreview | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
 
@@ -62,6 +63,13 @@ export default function CaptureScreen() {
   useEffect(() => {
     updateFlow({ type: 'ENTER_CAPTURE' });
   }, [updateFlow]);
+
+  // A double-tapped Continue pushes once; refocusing re-arms the button.
+  useFocusEffect(
+    useCallback(() => {
+      setLeaving(false);
+    }, []),
+  );
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -166,9 +174,12 @@ export default function CaptureScreen() {
   }, [clearImages, isPreparing]);
 
   const handleContinue = useCallback(() => {
-    if (!canContinue) return;
+    if (!canContinue || leaving) return;
+    // Guard: one push per tap so a double-tap cannot stack two analyzing
+    // screens (each would fire its own paid analysis request).
+    setLeaving(true);
     router.push('/analyzing');
-  }, [canContinue]);
+  }, [canContinue, leaving]);
 
   const retryPermission = useCallback(() => {
     setCameraFailure(null);
@@ -443,7 +454,7 @@ export default function CaptureScreen() {
 
         <Button
           accessibilityHint="Continues with the saved label photos"
-          disabled={!canContinue}
+          disabled={!canContinue || leaving}
           onPress={handleContinue}
           title={
             confirmedCount === 0

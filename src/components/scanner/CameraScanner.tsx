@@ -94,6 +94,7 @@ export function CameraScanner() {
   const [cameraSession, setCameraSession] = useState(0);
   const [detectedBarcode, setDetectedBarcode] = useState<DetectedBarcode | null>(null);
   const [lookup, setLookup] = useState<LookupState>({ status: 'idle' });
+  const [navigating, setNavigating] = useState(false);
   const scanLock = useRef(new BarcodeScanLock());
   const autoRequestAttempted = useRef(false);
   const previouslyFocused = useRef(isFocused);
@@ -105,9 +106,21 @@ export function CameraScanner() {
     scanLock.current.reset();
     setDetectedBarcode(null);
     setLookup({ status: 'idle' });
+    setNavigating(false);
     setBarcodeData(undefined, undefined);
     updateFlow({ type: 'FOCUS_SCANNER' });
   }, [setBarcodeData, updateFlow]);
+
+  // One navigation per tap: a double-tap must not stack two capture or
+  // analyzing screens (two analyzing screens = two paid analyses).
+  const navigateOnce = useCallback(
+    (target: '/capture' | '/analyzing') => {
+      if (navigating) return;
+      setNavigating(true);
+      router.push(target);
+    },
+    [navigating],
+  );
 
   const runLookup = useCallback(
     (barcode: string) => {
@@ -422,7 +435,8 @@ export function CameraScanner() {
             {lookup.status === 'complete' ? (
               <Button
                 accessibilityHint="Analyzes this product from its database data"
-                onPress={() => router.push('/analyzing')}
+                disabled={navigating}
+                onPress={() => navigateOnce('/analyzing')}
                 size="compact"
                 title="Analyze"
               />
@@ -433,7 +447,8 @@ export function CameraScanner() {
             lookup.status === 'error' ? (
               <Button
                 accessibilityHint="Opens the label photo screen"
-                onPress={() => router.push('/capture')}
+                disabled={navigating}
+                onPress={() => navigateOnce('/capture')}
                 size="compact"
                 title="Scan label"
               />

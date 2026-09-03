@@ -86,7 +86,11 @@ export async function requestStructuredAnalysis(
         model: options.model,
         messages,
         response_format: responseFormat,
-        provider: { require_parameters: true },
+        // Privacy + reliability routing: endpoints must support our
+        // parameters, and providers that store user data are excluded.
+        // (ZDR-only `zdr: true` is stricter — enable only after live tests
+        // confirm a compatible endpoint for the chosen model.)
+        provider: { require_parameters: true, data_collection: 'deny' },
         stream: false,
       }),
     });

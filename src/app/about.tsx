@@ -29,7 +29,9 @@ export default function AboutScreen() {
         <Card>
           <SectionHeading title="Privacy" />
           <ThemedText>
-            No account, application database, or scan history is used. Camera images are intended only for the current analysis and are not intentionally retained by ScanLabel.
+            No account, application database, or scan history is used. The camera is used only to
+            scan barcodes and photograph labels. Label photos are sent once for the current analysis
+            and are not intentionally retained by ScanLabel — starting a new scan discards them.
           </ThemedText>
         </Card>
 
@@ -43,14 +45,19 @@ export default function AboutScreen() {
         <Card>
           <SectionHeading title="Data sources" />
           <ThemedText>
-            A photographed current package label is the primary source when readable. Barcode data may supplement it, and AI may help extract and explain the provided facts without filling in missing values.
+            A photographed current package label is the primary source when readable. Barcode data
+            may supplement it, and an AI service transiently processes the provided facts to extract
+            and explain them without filling in missing values.
           </ThemedText>
         </Card>
 
         <Card>
           <SectionHeading title="Open Food Facts attribution" />
           <ThemedText>
-            Placeholder for the final Open Food Facts database attribution, license notice, and source link required before release.
+            Barcode lookups use Open Food Facts data: © Open Food Facts contributors. The database
+            is available under the Open Database License (ODbL) and its individual contents under
+            the Database Contents License (DbCL). Product images are not reused by this app. See
+            world.openfoodfacts.org/terms-of-use.
           </ThemedText>
         </Card>
       </View>

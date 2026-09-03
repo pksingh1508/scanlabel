@@ -34,7 +34,7 @@ If a later step reveals a defect in an earlier foundation, return to the earlier
 - [ ] Step 9 — Integrate OpenRouter structured label analysis
 - [ ] Step 10 — Connect scan pipeline end-to-end
 - [x] Step 11 — Build production result UI
-- [ ] Step 12 — Add reliability, privacy, and abuse protection
+- [x] Step 12 — Add reliability, privacy, and abuse protection
 - [ ] Step 13 — Test with real food labels
 - [ ] Step 14 — Prepare production builds and release requirements
 
@@ -1390,13 +1390,28 @@ Add appropriate attribution/license notice based on current Open Food Facts reus
 
 Perform a privacy-oriented code review:
 
-- search repository for `OPENROUTER_API_KEY`
-- search repository for direct model-provider URLs or keys
-- search for `EXPO_PUBLIC`
-- search for logging of base64
-- inspect production request logs
-- inspect app permissions
-- inspect network calls
+- [x] search repository for `OPENROUTER_API_KEY`
+- [x] search repository for direct model-provider URLs or keys
+- [x] search for `EXPO_PUBLIC`
+- [x] search for logging of base64
+- [x] inspect production request logs
+- [x] inspect app permissions
+- [x] inspect network calls
+
+## Recorded Decisions
+
+- Real gaps closed in code (everything else on the Step 12 lists already existed from Steps 3–11):
+  - Double submission across screens: Continue (capture), Analyze/Scan-label (scanner), Scan-label (home) now navigate once per tap with focus re-arm — a double-tap can no longer stack two analyzing screens (each would fire its own paid request). In-flight locks (scan lock, isCapturing/isPreparing, analyzing run-once + unmount abort) unchanged.
+  - Output-size control: `MAX_ANALYSIS_RESPONSE_BYTES` (200KB) in `service.ts` — schema-valid but absurd output fails closed as `invalid_result` after the single allowed retry (verified: 2500-item payload → invalid_result, exactly 2 attempts).
+  - Provider privacy: `provider: { require_parameters: true, data_collection: 'deny' }` per current OpenRouter routing docs (confirmed on the wire). ZDR-only `zdr: true` deliberately NOT forced — endpoint compatibility with the chosen model needs live testing first; recorded as a pre-launch evaluation.
+- About screen: full Step 12 copy (camera purpose, transient images, no account/history, OFF + AI processing, non-medical), and real OFF attribution (© contributors, ODbL/DbCL, no product-image reuse, terms link) replacing the placeholder.
+- Privacy matrix results: key referenced only in `analyze+api.ts`; no direct provider URLs/keys; `EXPO_PUBLIC` appears only in a comment; the single `console.log` is the sanitized JSON line (prior steps verified no base64/label text/key in logs); no DB/auth/tracking packages; permissions = camera only (microphone explicitly disabled); network inventory = OFF API + OpenRouter gateway (server) + `/api/analyze` + local file reads.
+- Offline is handled reactively (network/timeout → offline-coded messages + retry) with no connectivity SDK — a deliberate no-new-dependency call.
+- Owner-side remainder (dashboard, pre-launch): OpenRouter spend limit + usage monitoring, hosting WAF/rate limiting, ZDR evaluation, device attestation evaluation — tracked for Step 14.
+
+## Step Status
+
+Completed on 2026-09-03. Verified: oversized-output + provider-prefs stub checks, full 7-item privacy review with grep evidence, strict TypeScript, ESLint clean, Expo Doctor 21/21, web + API-route production export.
 
 ## Gate
 
@@ -1490,6 +1505,20 @@ Also test:
 ## Gate
 
 Step 13 passes when the app is acceptably accurate on the agreed real-world test set and known weaknesses are documented.
+
+## Recorded Decisions
+
+- Executable part completed 2026-09-03 without device/key: live OFF readiness pre-check across all 15 matrix categories through the app's own `normalizeOffProduct` + `evaluateProductCompleteness` — **14/15 complete, 1 needs_label** (instant noodles lack ingredients in OFF, so they must take the label-photo path). No normalize crashes, no `not_food` misclassifications. OFF search throttled the sweep (HTTP 503) — query politely with delays and an identifying User-Agent.
+- QA sheet created at `qa/real-label-matrix.md` (local dev artifact, not a user database): per-category rows pre-filled with sample barcodes + OFF expectations, blank device/AI columns for the physical pass, adversarial table (glare, curve, tiny type, partial crop, dark package, multilingual, unclear kcal, marketing claims, multiple servings), and a known-weaknesses section.
+- Adversarial fallback chain re-verified by construction (Steps 7/10/11 units): unreadable → `insufficient_data` + retake prompt, never invented facts. No source changes in this step.
+
+## Step Status
+
+Blocked on hardware + funded key (see Blocker). No `src` changes; typecheck/lint/doctor unaffected.
+
+## Blocker
+
+The physical matrix needs a real Android + iOS device AND a funded `OPENROUTER_API_KEY` (Step 9 gate): scan all 15 `qa/real-label-matrix.md` rows end-to-end, verify every fact against the physical package (not OFF), run the 9 adversarial conditions, and record accuracy plus weaknesses in the sheet. This same pass also clears the Step 9 dataset and Step 10 walkthrough blockers.
 
 **Do not start Step 14 until Step 13 passes.**
 

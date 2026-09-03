@@ -1,4 +1,5 @@
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { BrandMark } from '@/components/scanner/BrandMark';
@@ -11,6 +12,14 @@ import { spacing } from '@/theme';
 
 export default function HomeScreen() {
   const { setBarcodeData, clearImages } = useScan();
+  const [leaving, setLeaving] = useState(false);
+
+  // A double-tapped Scan label pushes once; refocusing re-arms the button.
+  useFocusEffect(
+    useCallback(() => {
+      setLeaving(false);
+    }, []),
+  );
   return (
     <Screen scroll testID="home-screen">
       <View style={styles.header}>
@@ -41,10 +50,13 @@ export default function HomeScreen() {
         </ThemedText>
         <Button
           accessibilityHint="Opens the label capture screen"
+          disabled={leaving}
           onPress={() => {
+            if (leaving) return;
             // Direct label path starts a fresh session with no barcode.
             setBarcodeData(undefined, undefined);
             clearImages();
+            setLeaving(true);
             router.push('/capture');
           }}
           title="Scan label"

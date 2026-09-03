@@ -35,6 +35,14 @@ export type AnalyzeScanResult =
   | { ok: true; analysis: ProductAnalysis; attempts: number }
   | { ok: false; error: AnalysisServiceError; attempts: number };
 
+/**
+ * Output-size control: a schema-valid response can still be absurdly large
+ * (e.g. thousands of ingredients). Cap serialized size to protect client
+ * memory and downstream costs; oversize output fails validation instead of
+ * shipping.
+ */
+export const MAX_ANALYSIS_RESPONSE_BYTES = 200_000;
+
 function toOpenRouterOptions(config: AnalysisServiceConfig): OpenRouterCallOptions {
   return {
     apiKey: config.apiKey,
@@ -137,6 +145,12 @@ export async function analyzeScan(
 
     const parsed = parseProductAnalysis(call.content);
     if (!parsed.ok) {
+      if (attempt === 2) {
+        return { ok: false, error: { code: 'invalid_result' }, attempts: attempt };
+      }
+      continue;
+    }
+    if (JSON.stringify(parsed.data).length > MAX_ANALYSIS_RESPONSE_BYTES) {
       if (attempt === 2) {
         return { ok: false, error: { code: 'invalid_result' }, attempts: attempt };
       }
