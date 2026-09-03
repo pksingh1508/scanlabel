@@ -1,4 +1,4 @@
-# AGENT.md — Label Scanner Product Contract
+# AGENTS.md — Label Scanner Product Contract
 
 ## 1. Purpose of This File
 
@@ -1076,7 +1076,7 @@ The MVP is done only when:
 
 Every agent must follow these rules:
 
-1. Read `AGENT.md`.
+1. Read `AGENTS.md`.
 2. Read `implementation.md`.
 3. Determine the current implementation step.
 4. Work only on the current step unless a dependency must be fixed.

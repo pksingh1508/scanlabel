@@ -22,7 +22,7 @@ If a later step reveals a defect in an earlier foundation, return to the earlier
 
 # Current Status
 
-- [ ] Step 0 — Lock product contract
+- [x] Step 0 — Lock product contract
 - [ ] Step 1 — Create Expo project foundation
 - [ ] Step 2 — Build static UI shell
 - [ ] Step 3 — Implement camera permission and scanner
@@ -48,21 +48,35 @@ Make sure the repository has one unambiguous definition of the app before code i
 
 ## Tasks
 
-- [ ] Add `AGENT.md` to repository root.
-- [ ] Add this `implementation.md` to repository root.
-- [ ] Confirm MVP constraints:
-  - [ ] no authentication
-  - [ ] no application database
-  - [ ] no scan history
-  - [ ] no user profile
-  - [ ] no payment
-  - [ ] no medical diagnosis
-  - [ ] server route allowed only for secure stateless analysis
-- [ ] Choose a temporary app name/package slug.
-- [ ] Decide initial supported UI language: English.
-- [ ] Decide supported target platforms:
-  - [ ] Android
-  - [ ] iOS
+- [x] Add `AGENTS.md` to repository root.
+- [x] Add this `implementation.md` to repository root.
+- [x] Confirm MVP constraints:
+  - [x] no authentication
+  - [x] no application database
+  - [x] no scan history
+  - [x] no user profile
+  - [x] no payment
+  - [x] no medical diagnosis
+  - [x] server route allowed only for secure stateless analysis
+- [x] Choose a temporary app name/package slug.
+- [x] Decide initial supported UI language: English.
+- [x] Decide supported target platforms:
+  - [x] Android
+  - [x] iOS
+
+## Recorded Decisions
+
+- Canonical product contract: `AGENTS.md`.
+- Temporary app name: `ScanLabel`.
+- Expo/package slug: `scanlabel`.
+- Initial UI language: English (`en`).
+- Target platforms: Android and iOS.
+- AI access: stateless server route through OpenRouter only; no AI provider secret in the mobile bundle.
+- Product boundaries remain fixed: no authentication, application database, scan history, user profile, payment, or personalized medical diagnosis.
+
+## Step Status
+
+Completed on 2026-09-03. Both product files exist, the temporary product identity and initial platforms are resolved, and no architecture question remains that blocks project foundation work.
 
 ## Gate
 
@@ -643,7 +657,7 @@ dataQuality
 disclaimer
 ```
 
-Follow the schema described in `AGENT.md`.
+Follow the schema described in `AGENTS.md`.
 
 ## Key rules
 
