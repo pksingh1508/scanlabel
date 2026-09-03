@@ -23,6 +23,7 @@ import type {
   NormalizedOffProduct,
   ProductCompleteness,
 } from '@/lib/open-food-facts/types';
+import { useScan } from '@/state/scan-context';
 import { layout, radius, spacing, useAppTheme } from '@/theme';
 
 import { Button } from '../ui/Button';
@@ -84,6 +85,7 @@ function CameraMessage({
 export function CameraScanner() {
   const { colors } = useAppTheme();
   const isFocused = useIsFocused();
+  const { setBarcodeData } = useScan();
   const [permission, requestPermission, refreshPermission] = useCameraPermissions();
   const [appState, setAppState] = useState<AppStateStatus>(AppState.currentState);
   const [torchEnabled, setTorchEnabled] = useState(false);
@@ -103,44 +105,52 @@ export function CameraScanner() {
     scanLock.current.reset();
     setDetectedBarcode(null);
     setLookup({ status: 'idle' });
-  }, []);
+    setBarcodeData(undefined, undefined);
+  }, [setBarcodeData]);
 
-  const runLookup = useCallback((barcode: string) => {
-    const requestId = lookupRequestId.current + 1;
-    lookupRequestId.current = requestId;
-    setLookup({ status: 'loading', barcode });
+  const runLookup = useCallback(
+    (barcode: string) => {
+      const requestId = lookupRequestId.current + 1;
+      lookupRequestId.current = requestId;
+      setLookup({ status: 'loading', barcode });
 
-    void fetchOffProduct(barcode)
-      .then((result) => {
-        if (lookupRequestId.current !== requestId) return;
-        if (result.kind === 'error') {
-          if (result.error.kind === 'not_found') {
-            setLookup({ status: 'not_found', barcode });
+      void fetchOffProduct(barcode)
+        .then((result) => {
+          if (lookupRequestId.current !== requestId) return;
+          if (result.kind === 'error') {
+            if (result.error.kind === 'not_found') {
+              setBarcodeData(barcode, undefined);
+              setLookup({ status: 'not_found', barcode });
+              return;
+            }
+            setLookup({ status: 'error', message: result.error.userMessage });
             return;
           }
-          setLookup({ status: 'error', message: result.error.userMessage });
-          return;
-        }
 
-        const completeness = evaluateProductCompleteness(result.product);
-        if (completeness.status === 'complete') {
-          setLookup({ status: 'complete', product: result.product, completeness });
-        } else if (completeness.status === 'needs_label') {
-          setLookup({ status: 'needs_label', product: result.product, missing: completeness.missing });
-        } else if (completeness.status === 'not_food') {
-          setLookup({ status: 'not_food', reason: completeness.reason });
-        } else {
-          setLookup({ status: 'not_found', barcode });
-        }
-      })
-      .catch(() => {
-        if (lookupRequestId.current !== requestId) return;
-        setLookup({
-          status: 'error',
-          message: 'The food database is unavailable right now. Try again or scan the label.',
+          const completeness = evaluateProductCompleteness(result.product);
+          if (completeness.status === 'complete') {
+            setBarcodeData(barcode, result.product);
+            setLookup({ status: 'complete', product: result.product, completeness });
+          } else if (completeness.status === 'needs_label') {
+            setBarcodeData(barcode, result.product);
+            setLookup({ status: 'needs_label', product: result.product, missing: completeness.missing });
+          } else if (completeness.status === 'not_food') {
+            setLookup({ status: 'not_food', reason: completeness.reason });
+          } else {
+            setBarcodeData(barcode, undefined);
+            setLookup({ status: 'not_found', barcode });
+          }
+        })
+        .catch(() => {
+          if (lookupRequestId.current !== requestId) return;
+          setLookup({
+            status: 'error',
+            message: 'The food database is unavailable right now. Try again or scan the label.',
+          });
         });
-      });
-  }, []);
+    },
+    [setBarcodeData],
+  );
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {

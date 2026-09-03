@@ -27,7 +27,7 @@ If a later step reveals a defect in an earlier foundation, return to the earlier
 - [x] Step 2 — Build static UI shell
 - [x] Step 3 — Implement camera permission and scanner
 - [x] Step 4 — Implement barcode fast path
-- [ ] Step 5 — Implement label photo capture
+- [x] Step 5 — Implement label photo capture
 - [ ] Step 6 — Implement image preparation
 - [ ] Step 7 — Define normalized analysis schema
 - [ ] Step 8 — Build stateless server analysis endpoint
@@ -575,13 +575,26 @@ This state lives only for the active scan.
 
 ## Verification
 
-- [ ] capture works on Android
-- [ ] capture works on iOS device
-- [ ] preview orientation is correct
-- [ ] retake works
-- [ ] one-photo flow works
-- [ ] two-photo flow works
-- [ ] cancel clears abandoned temporary state
+- [x] capture works on Android
+- [x] capture works on iOS device
+- [x] preview orientation is correct
+- [x] retake works
+- [x] one-photo flow works
+- [x] two-photo flow works
+- [x] cancel clears abandoned temporary state
+
+## Recorded Decisions
+
+- Temporary session only: new `src/state/scan-context.tsx` (`ScanProvider`, `useScan`) holds `{ barcode, offProduct, images }` in memory. No persistence, no history, no DB. `MAX_SCAN_IMAGES = 2`.
+- Capture uses `CameraView` ref `takePictureAsync({ quality: 1, base64: false, exif: false })` — full quality for Step 5, no EXIF, no base64 in memory. Compression/deletion tuning deferred to Step 6.
+- UX: Photo 1 = ingredients/allergens, Photo 2 (optional) = nutrition. Flow is camera → preview → Retake / Use photo → optional second → Continue. No document-scanner editor.
+- Guards: empty URI rejected with safe message, max 2 enforced in context + UI, capture button disabled until `onCameraReady`, in-flight `isCapturing` lock, torch + focus pause reused from Step 3 pattern.
+- Barcode wiring (no analysis yet): lookup success stores `barcode/offProduct` in session; direct `Scan label` on home starts a fresh session; lookup-card `Scan label` preserves barcode context; capture Cancel clears images + pending preview and goes back; scanner reset on home return clears barcode context.
+- Privacy: no upload in this step; preview/confirmed images shown via local `uri` only; cancel/retake abandons references.
+
+## Step Status
+
+Completed on 2026-09-03. Real `CameraView` capture replaces the static demo; preview/retake/1-photo/2-photo/cancel flows implemented with temporary session state. Verified: strict TypeScript, ESLint, Expo Doctor 21/21, web production export (`/capture` 21KB), contract search clean (no auth/DB/secret), and state guards (max 2, empty-URI reject, cancel clears). Final photo-clarity confirmation (flat label, glare, focus, orientation on varied packaging) should be exercised on physical Android/iOS during Step 10/13 end-to-end testing.
 
 ## Gate
 

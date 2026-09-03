@@ -6,9 +6,11 @@ import { CameraScanner } from '@/components/scanner/CameraScanner';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { ThemedText } from '@/components/ui/ThemedText';
+import { useScan } from '@/state/scan-context';
 import { spacing } from '@/theme';
 
 export default function HomeScreen() {
+  const { setBarcodeData, clearImages } = useScan();
   return (
     <Screen scroll testID="home-screen">
       <View style={styles.header}>
@@ -39,7 +41,12 @@ export default function HomeScreen() {
         </ThemedText>
         <Button
           accessibilityHint="Opens the label capture screen"
-          onPress={() => router.push('/capture')}
+          onPress={() => {
+            // Direct label path starts a fresh session with no barcode.
+            setBarcodeData(undefined, undefined);
+            clearImages();
+            router.push('/capture');
+          }}
           title="Scan label"
         />
         <ThemedText muted style={styles.centered} variant="caption">

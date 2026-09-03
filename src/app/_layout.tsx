@@ -3,12 +3,14 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { typography, useAppTheme } from '@/theme';
+import { ScanProvider } from '@/state/scan-context';
 
 export default function RootLayout() {
   const { colors, isDark } = useAppTheme();
 
   return (
     <SafeAreaProvider>
+      <ScanProvider>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack
         screenOptions={{
@@ -25,6 +27,7 @@ export default function RootLayout() {
         <Stack.Screen name="result" options={{ title: 'Label result' }} />
         <Stack.Screen name="about" options={{ title: 'About ScanLabel' }} />
       </Stack>
+      </ScanProvider>
     </SafeAreaProvider>
   );
 }
