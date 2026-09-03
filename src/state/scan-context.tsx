@@ -6,11 +6,17 @@ export const MAX_SCAN_IMAGES = 2;
 
 export type ScanImageKind = 'ingredients' | 'nutrition';
 
+export type ScanImageMimeType = 'image/jpeg' | 'image/png';
+
 export type ScanImage = {
   uri: string;
   kind: ScanImageKind;
   width?: number;
   height?: number;
+  /** Prepared upload payload type. Always JPEG after Step 6 preparation. */
+  mimeType?: ScanImageMimeType;
+  /** Prepared file size in bytes when measurable. */
+  sizeBytes?: number;
 };
 
 /**

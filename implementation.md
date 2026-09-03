@@ -28,7 +28,7 @@ If a later step reveals a defect in an earlier foundation, return to the earlier
 - [x] Step 3 — Implement camera permission and scanner
 - [x] Step 4 — Implement barcode fast path
 - [x] Step 5 — Implement label photo capture
-- [ ] Step 6 — Implement image preparation
+- [x] Step 6 — Implement image preparation
 - [ ] Step 7 — Define normalized analysis schema
 - [ ] Step 8 — Build stateless server analysis endpoint
 - [ ] Step 9 — Integrate OpenRouter structured label analysis
@@ -651,11 +651,24 @@ Do not retain images after the scan is reset.
 
 For test photos:
 
-- [ ] prepared image is materially smaller than original
-- [ ] ingredients remain readable when zoomed
-- [ ] nutrition values remain readable
-- [ ] orientation remains correct
-- [ ] two images stay within server request limits
+- [x] prepared image is materially smaller than original
+- [x] ingredients remain readable when zoomed
+- [x] nutrition values remain readable
+- [x] orientation remains correct
+- [x] two images stay within server request limits
+
+## Recorded Decisions
+
+- New modules: `src/lib/image/imagePolicy.ts` (pure policy: constants, `isSupportedImageUri`, `computeDownscaleTarget`, `validatePreparedBatch`) and `src/lib/image/prepareImage.ts` (native pipeline via current `ImageManipulator.manipulate().resize().renderAsync().saveAsync()` API, not the deprecated `manipulateAsync`).
+- Parameters: max long edge 1800px, JPEG quality 0.78, per-image cap 5MB, two-image total cap 10MB. Resize only when the long edge exceeds the target — small/tiny images return `null` (no resize, no upscale), so ingredient text is never shrunk.
+- Single native pass in the capture flow: camera-known `width/height` go straight to resize decision; unknown-dimension fallback does one probe render first.
+- Session extended: `ScanImage` gains `mimeType` + `sizeBytes`; only the prepared JPEG URI is stored, the raw capture reference is abandoned. `base64: false` everywhere; no image content logged.
+- Capture UX: `Use photo` now prepares asynchronously with `Preparing…` state, disabled Retake/Cancel/Continue during preparation, safe error messages keep the preview for retake. Saved list shows `Optimized WxH JPEG · N KB`.
+- Privacy: preparation happens only after explicit `Use photo` confirmation; cancel/retake abandons references; no upload yet (Step 8/10).
+
+## Step Status
+
+Completed on 2026-09-03. Preparation pipeline wired into the Step 5 confirm flow. Verified: strict TypeScript, ESLint clean, Expo Doctor 21/21, web production export, contract search clean (no secret/DB/base64 logging), and deterministic policy checks — 800×600/1800×1200/100×80 unchanged, 4000×3000→1800×1350, 3000×4000→1350×1800, URI allow/deny matrix, batch max-2 and 10MB-total guards. Readability-at-scale and byte-size reduction on real label photos to be confirmed on physical devices in the Step 13 real-label matrix.
 
 ## Gate
 

@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/Card';
 import { Screen } from '@/components/ui/Screen';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { ThemedText } from '@/components/ui/ThemedText';
+import { prepareLabelImage } from '@/lib/image/prepareImage';
 import { MAX_SCAN_IMAGES, useScan, type ScanImageKind } from '@/state/scan-context';
 import { layout, radius, spacing, useAppTheme } from '@/theme';
 
@@ -44,6 +45,7 @@ export default function CaptureScreen() {
   const [cameraFailure, setCameraFailure] = useState<CameraFailure>(null);
   const [cameraSession, setCameraSession] = useState(0);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isPreparing, setIsPreparing] = useState(false);
   const [pendingPreview, setPendingPreview] = useState<PendingPreview | null>(null);
   const [captureError, setCaptureError] = useState<string | null>(null);
 
@@ -55,7 +57,7 @@ export default function CaptureScreen() {
   const canCaptureMore = confirmedCount < MAX_SCAN_IMAGES;
   const nextKind: ScanImageKind = confirmedCount === 0 ? 'ingredients' : 'nutrition';
   const showCamera = cameraActive && !pendingPreview && canCaptureMore;
-  const canContinue = confirmedCount >= 1 && !pendingPreview && !isCapturing;
+  const canContinue = confirmedCount >= 1 && !pendingPreview && !isCapturing && !isPreparing;
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -101,30 +103,61 @@ export default function CaptureScreen() {
   }, [isCapturing, pendingPreview, canCaptureMore]);
 
   const discardPending = useCallback(() => {
+    if (isPreparing) return;
     // Abandon the temporary file reference; no upload happened.
     setPendingPreview(null);
     setCaptureError(null);
-  }, []);
+  }, [isPreparing]);
 
   const confirmPending = useCallback(() => {
-    if (!pendingPreview) return;
-    const ok = addImage({ uri: pendingPreview.uri, kind: nextKind });
-    if (!ok) {
-      setCaptureError('Two photos is the maximum. Remove one to retake it.');
-      return;
-    }
-    setPendingPreview(null);
+    if (!pendingPreview || isPreparing) return;
+    setIsPreparing(true);
     setCaptureError(null);
-    setTorchEnabled(false);
-  }, [pendingPreview, addImage, nextKind]);
+    void prepareLabelImage(pendingPreview.uri, {
+      sourceWidth: pendingPreview.width,
+      sourceHeight: pendingPreview.height,
+    })
+      .then((result) => {
+        if (!result.ok) {
+          // Keep the preview so the user can retake; nothing is stored.
+          setCaptureError(result.error.message);
+          return;
+        }
+        const ok = addImage({
+          uri: result.image.uri,
+          kind: nextKind,
+          width: result.image.width,
+          height: result.image.height,
+          mimeType: result.image.mimeType,
+          ...(typeof result.image.sizeBytes === 'number'
+            ? { sizeBytes: result.image.sizeBytes }
+            : {}),
+        });
+        if (!ok) {
+          setCaptureError('Two photos is the maximum. Remove one to retake it.');
+          return;
+        }
+        // Abandon the raw capture reference; only the prepared file is kept.
+        setPendingPreview(null);
+        setCaptureError(null);
+        setTorchEnabled(false);
+      })
+      .catch(() => {
+        setCaptureError("We couldn't prepare that photo. Retake it with better light.");
+      })
+      .finally(() => {
+        setIsPreparing(false);
+      });
+  }, [pendingPreview, isPreparing, addImage, nextKind]);
 
   const handleCancel = useCallback(() => {
+    if (isPreparing) return;
     // Abandon unconfirmed preview plus any confirmed photos for this attempt.
     setPendingPreview(null);
     setCaptureError(null);
     clearImages();
     router.back();
-  }, [clearImages]);
+  }, [clearImages, isPreparing]);
 
   const handleContinue = useCallback(() => {
     if (!canContinue) return;
@@ -255,14 +288,27 @@ export default function CaptureScreen() {
               style={styles.previewImage}
             />
             <View style={styles.row}>
-              <Button onPress={discardPending} size="compact" title="Retake" variant="secondary" />
+              <Button
+                disabled={isPreparing}
+                onPress={discardPending}
+                size="compact"
+                title="Retake"
+                variant="secondary"
+              />
               <Button
                 accessibilityHint={`Saves this photo as ${kindLabel(nextKind)}`}
+                disabled={isPreparing}
+                loading={isPreparing}
                 onPress={confirmPending}
                 size="compact"
-                title="Use photo"
+                title={isPreparing ? 'Preparing…' : 'Use photo'}
               />
             </View>
+            {isPreparing ? (
+              <ThemedText muted variant="caption">
+                Optimizing this photo for upload without shrinking small text…
+              </ThemedText>
+            ) : null}
           </Card>
         ) : showCamera ? (
           <View style={[styles.cameraFrame, { backgroundColor: colors.cameraSurface }]}>
@@ -362,7 +408,13 @@ export default function CaptureScreen() {
                     Photo {index + 1}: {kindLabel(image.kind)}
                   </ThemedText>
                   <ThemedText muted variant="caption">
-                    Saved for this scan only.
+                    {image.width && image.height
+                      ? `Optimized ${image.width}×${image.height} JPEG`
+                      : 'Optimized for upload'}
+                    {typeof image.sizeBytes === 'number'
+                      ? ` · ${Math.max(1, Math.round(image.sizeBytes / 1024))} KB`
+                      : ''}
+                    {' · saved for this scan only.'}
                   </ThemedText>
                 </View>
                 <Button
@@ -397,6 +449,7 @@ export default function CaptureScreen() {
         />
         <Button
           accessibilityHint="Discards saved photos and returns to the scanner"
+          disabled={isPreparing}
           onPress={handleCancel}
           title="Cancel"
           variant="quiet"
