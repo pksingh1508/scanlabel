@@ -24,7 +24,7 @@ If a later step reveals a defect in an earlier foundation, return to the earlier
 
 - [x] Step 0 — Lock product contract
 - [x] Step 1 — Create Expo project foundation
-- [ ] Step 2 — Build static UI shell
+- [x] Step 2 — Build static UI shell
 - [ ] Step 3 — Implement camera permission and scanner
 - [ ] Step 4 — Implement barcode fast path
 - [ ] Step 5 — Implement label photo capture
@@ -283,13 +283,17 @@ Include placeholders for:
 
 ## Verification
 
-- [ ] all routes open
-- [ ] back navigation behaves correctly
-- [ ] fake result renders from one normalized fixture object
-- [ ] long ingredient list is scrollable
-- [ ] long product name does not break layout
-- [ ] dynamic text does not overlap critical controls
-- [ ] "Scan another" returns to initial scanner state
+- [x] all routes open
+- [x] back navigation behaves correctly
+- [x] fake result renders from one normalized fixture object
+- [x] long ingredient list is scrollable
+- [x] long product name does not break layout
+- [x] dynamic text does not overlap critical controls
+- [x] "Scan another" returns to initial scanner state
+
+## Step Status
+
+Completed on 2026-09-03. The static demo now covers the scanner home, capture placeholder, non-technical analyzing state, normalized fake result, and About screen. A shared light/dark token system and accessible UI primitives keep spacing, typography, color, control sizing, and text growth consistent. The full browser flow, native-style back navigation, collapsible and scrollable ingredient content, long product wrapping, and scan reset were exercised manually. Strict TypeScript, ESLint, Expo Doctor (21/21), and production exports for Android, iOS, and web all passed.
 
 ## Gate
 

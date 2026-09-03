@@ -1,36 +1,73 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
+
+import { BrandMark } from '@/components/scanner/BrandMark';
+import { ScannerPreview } from '@/components/scanner/ScannerPreview';
+import { Button } from '@/components/ui/Button';
+import { Screen } from '@/components/ui/Screen';
+import { ThemedText } from '@/components/ui/ThemedText';
+import { spacing } from '@/theme';
 
 export default function HomeScreen() {
   return (
-    <View style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <Text style={styles.title}>ScanLabel</Text>
-        <Text style={styles.subtitle}>Project foundation ready.</Text>
-      </SafeAreaView>
-    </View>
+    <Screen scroll testID="home-screen">
+      <View style={styles.header}>
+        <BrandMark />
+        <Button
+          accessibilityHint="Opens app purpose, privacy, and data source information"
+          onPress={() => router.push('/about')}
+          size="compact"
+          title="About"
+          variant="quiet"
+        />
+      </View>
+
+      <View style={styles.intro}>
+        <ThemedText accessibilityRole="header" variant="display">
+          Scan a food label
+        </ThemedText>
+        <ThemedText muted>
+          Understand the nutrition, ingredients, allergens, and what stands out.
+        </ThemedText>
+      </View>
+
+      <ScannerPreview />
+
+      <View style={styles.actions}>
+        <ThemedText style={styles.centered} variant="bodyStrong">
+          Keep the label flat, fill the frame, and avoid glare.
+        </ThemedText>
+        <Button
+          accessibilityHint="Opens the label capture screen"
+          onPress={() => router.push('/capture')}
+          title="Scan label"
+        />
+        <ThemedText muted style={styles.centered} variant="caption">
+          No account or scan history. Label images are used only for the current analysis.
+        </ThemedText>
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F7F8F4',
-  },
-  safeArea: {
-    flex: 1,
+  header: {
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: spacing.sm,
   },
-  title: {
-    color: '#17352A',
-    fontSize: 32,
-    fontWeight: '700',
+  intro: {
+    gap: spacing.xs,
+    paddingBottom: spacing.lg,
+    paddingTop: spacing.xl,
   },
-  subtitle: {
-    color: '#4C6259',
-    fontSize: 16,
-    marginTop: 8,
+  actions: {
+    gap: spacing.md,
+    paddingBottom: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  centered: {
+    textAlign: 'center',
   },
 });
