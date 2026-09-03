@@ -30,7 +30,7 @@ If a later step reveals a defect in an earlier foundation, return to the earlier
 - [x] Step 5 — Implement label photo capture
 - [x] Step 6 — Implement image preparation
 - [x] Step 7 — Define normalized analysis schema
-- [ ] Step 8 — Build stateless server analysis endpoint
+- [x] Step 8 — Build stateless server analysis endpoint
 - [ ] Step 9 — Integrate OpenRouter structured label analysis
 - [ ] Step 10 — Connect scan pipeline end-to-end
 - [ ] Step 11 — Build production result UI
@@ -880,14 +880,28 @@ Do not log:
 
 Using curl/Postman/test client:
 
-- [ ] missing request rejected with 400
-- [ ] too many images rejected
-- [ ] oversized request rejected
-- [ ] no key returns controlled server failure
-- [ ] route secret not present in client JS bundle
-- [ ] route returns mock normalized analysis
+- [x] missing request rejected with 400
+- [x] too many images rejected
+- [x] oversized request rejected
+- [x] no key returns controlled server failure
+- [x] route secret not present in client JS bundle
+- [x] route returns mock normalized analysis
 
 Use a mock analysis service first.
+
+## Recorded Decisions
+
+- Route `src/app/api/analyze+api.ts` exports `POST` only (other methods auto-405). `app.json` `web.output` changed `static` → `server` per current Expo API-route docs; `npx expo export -p web` now emits `dist/client` + `dist/server` with `/api/analyze` as a server function.
+- Validation order: content-type → body-size cap (15MB) → JSON parse → `validateAnalyzeRequest` (`src/lib/analysis/request.ts`: barcode digits ≤32, OFF object ≤100KB, ≤2 images, JPEG/PNG only, base64 charset + ≤7M chars, at-least-one-source) → env check → mock → Step 7 `normalizeProductAnalysis`.
+- Missing `OPENROUTER_API_KEY` returns controlled 503 (never a stack trace). Gateway `https://openrouter.ai/api/v1` kept as a server-side constant staged for Step 9; no gateway URL accepted from the client.
+- Mock (`src/lib/analysis/mock.ts`) is deterministic and honest: echoes only safe identity fields, always `insufficient_data` with a mock-mode warning — never mistaken for a real assessment.
+- Logging is one JSON line per request: requestId/elapsedMs/status/source/imageCount/barcodePresent/errorCode. No base64, label text, key, or provider payloads.
+- Typed caller `src/lib/analysis/client.ts` (`requestAnalysis`, 30s abort timeout) runtime-validates every response; maps 503/500→unavailable, 4xx→rejected with server message, bad-shape→invalid_response, abort→timeout, fetch failure→network. No UI wiring yet (Step 10).
+- No persistence anywhere; `zod` stays the single contract gate on the way out.
+
+## Step Status
+
+Completed on 2026-09-03. Verified: 24/24 validation+mock unit checks; live dev-server matrix (GET→405; no-key valid→503; `{}`→400 no_data; 3 images→400; text/plain→400; malformed JSON→400; with-key barcode/image/combined→200 with correct source + standard disclaimer; 16MB body→413); 5/5 client-mapping checks (live 200 parses; stub bad-shape→invalid_response; 400→rejected; 503→unavailable; dead port→network); server logs sanitized; production export contains `/api/analyze` with the dummy key ABSENT from the client bundle; strict TypeScript, ESLint clean, Expo Doctor 21/21.
 
 ## Gate
 
