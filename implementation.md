@@ -23,7 +23,7 @@ If a later step reveals a defect in an earlier foundation, return to the earlier
 # Current Status
 
 - [x] Step 0 — Lock product contract
-- [ ] Step 1 — Create Expo project foundation
+- [x] Step 1 — Create Expo project foundation
 - [ ] Step 2 — Build static UI shell
 - [ ] Step 3 — Implement camera permission and scanner
 - [ ] Step 4 — Implement barcode fast path
@@ -149,13 +149,13 @@ src/constants/
 
 ## Engineering configuration
 
-- [ ] TypeScript strict mode
-- [ ] ESLint works
-- [ ] formatter configured if desired
-- [ ] `.env` ignored
-- [ ] `.env.example` created without secrets
-- [ ] no API key in source
-- [ ] project boots without warnings caused by our code
+- [x] TypeScript strict mode
+- [x] ESLint works
+- [x] formatter intentionally deferred; optional formatting is not required for the foundation
+- [x] `.env` ignored
+- [x] `.env.example` created without secrets
+- [x] no API key in source
+- [x] project boots without warnings caused by our code
 
 ## Verification
 
@@ -169,10 +169,24 @@ Then launch the project.
 
 Verify:
 
-- [ ] app renders on Android device/emulator
-- [ ] app renders on iOS device/simulator where available
-- [ ] no auth/database package exists
-- [ ] no secret exists in the client bundle
+- [x] app renders on Android device/emulator
+- [x] app renders on iOS device/simulator where available
+- [x] no auth/database package exists
+- [x] no secret exists in the client bundle
+
+## Recorded Decisions
+
+- Expo SDK: `57.0.0` (`expo` package `~57.0.19`).
+- Package manager: pnpm `10.33.0`.
+- Android package: `com.pawankumar.scanlabel`.
+- iOS bundle identifier: `com.pawankumar.scanlabel`.
+- Camera permission copy: “Allow ScanLabel to use your camera to scan food labels and barcodes.”
+- Microphone access is disabled in the `expo-camera` config plugin for both iOS and Android.
+- No formatter was added; ESLint and TypeScript are the foundation quality gates.
+
+## Step Status
+
+Completed on 2026-09-03. The minimal app rendered successfully on a Pixel 9 Android emulator and an iPhone 17 Pro iOS simulator. Lint, strict TypeScript, Expo Doctor, app-config validation, and production exports for Android, iOS, and web all passed. The repository contains no authentication/database package or client secret.
 
 ## Gate
 
