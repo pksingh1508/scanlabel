@@ -1,5 +1,6 @@
 import { StyleSheet, View } from 'react-native';
 
+import { formatNutrient } from '@/lib/analysis/format';
 import { layout, radius, spacing, useAppTheme } from '@/theme';
 import type { ProductAnalysis } from '@/types/analysis';
 
@@ -27,7 +28,7 @@ export function NutritionGrid({ nutrition }: NutritionGridProps) {
     <View style={styles.grid}>
       {(Object.keys(LABELS) as (keyof ProductAnalysis['nutrition'])[]).map((key) => {
         const nutrient = nutrition[key];
-        const value = nutrient.value === null ? 'Not listed' : `${nutrient.value} ${nutrient.unit ?? ''}`.trim();
+        const value = formatNutrient(nutrient.value, nutrient.unit);
 
         return (
           <View

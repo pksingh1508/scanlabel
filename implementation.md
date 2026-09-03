@@ -33,7 +33,7 @@ If a later step reveals a defect in an earlier foundation, return to the earlier
 - [x] Step 8 — Build stateless server analysis endpoint
 - [ ] Step 9 — Integrate OpenRouter structured label analysis
 - [ ] Step 10 — Connect scan pipeline end-to-end
-- [ ] Step 11 — Build production result UI
+- [x] Step 11 — Build production result UI
 - [ ] Step 12 — Add reliability, privacy, and abuse protection
 - [ ] Step 13 — Test with real food labels
 - [ ] Step 14 — Prepare production builds and release requirements
@@ -1287,12 +1287,23 @@ Exact wording may be refined, but the meaning must remain.
 
 ## Verification
 
-- [ ] missing field layouts remain clean
-- [ ] long ingredients work
-- [ ] low-confidence warning is visible
-- [ ] allergens cannot be confused with traces
-- [ ] verdict reason is visible
-- [ ] app never shows "undefined", NaN, or empty unit strings
+- [x] missing field layouts remain clean
+- [x] long ingredients work
+- [x] low-confidence warning is visible
+- [x] allergens cannot be confused with traces
+- [x] verdict reason is visible
+- [x] app never shows "undefined", NaN, or empty unit strings
+
+## Recorded Decisions
+
+- Built with the `expo-design-system` skill: audit first — zero token drift found (no hex/fontSize/spacing escapes, all radius tokenized, no legacy shadows), so the existing `src/theme` + `src/components/ui|result` system was extended in its own idiom. No new system, no new shared component (nothing repeats across ≥2 screens).
+- New pure module `src/lib/analysis/format.ts` (no React/native imports, fully unit-tested): `formatKcal`/`formatNutrient` (null/undefined/NaN/Infinity → '—'/'Not listed'; zero stays `0 g`, never blanked; missing unit → bare number, never "12 undefined"), `formatServingLine` (drops blanks), `verdictTone` (good→positive, best_limited→concern, else neutral — color never carries meaning alone), `needsQualityBanner`, source/confidence labels, one-line Nutri-Score/NOVA explainers.
+- `NutritionGrid` now formats through the helper; `result.tsx` hardened: verdict tone mapping, "Limited label data" banner for medium/low confidence or `insufficient_data` (with missing-fields summary), empty-state fallbacks for positives/concerns/allergens/ingredients/missing/warnings (no more blank cards or dangling "Contains" headings), calories handles both-null ("not listed") and missing serving ("As listed"), nutrition basis line is source-aware (database values are usually per 100 g — previously mislabeled as "photographed serving").
+- Hierarchy unchanged per spec (verdict → calories/macros → positives/concerns → allergens → ingredients → signals → data quality → disclaimer → Scan another); severe-allergy verification warning always rendered.
+
+## Step Status
+
+Completed on 2026-09-03. Verified: 32/32 checks (helper matrix incl. NaN/Infinity/zero/blank-unit hostiles; all 6 fixtures swept for undefined/NaN/bare-unit output; per-fixture branch expectations for banner/fallback/tone/separation paths), strict TypeScript, ESLint clean, Expo Doctor 21/21, web + API-route production export. Final grocery-store readability confirmation rides with the Step 13 device pass.
 
 ## Gate
 

@@ -11,6 +11,16 @@ import { Screen } from '@/components/ui/Screen';
 import { SectionHeading } from '@/components/ui/SectionHeading';
 import { ThemedText } from '@/components/ui/ThemedText';
 import { DEMO_PRODUCT_ANALYSIS } from '@/lib/analysis/demo-fixture';
+import {
+  formatConfidence,
+  formatKcal,
+  formatServingLine,
+  formatSourceLabel,
+  needsQualityBanner,
+  novaGroupContext,
+  nutriScoreContext,
+  verdictTone,
+} from '@/lib/analysis/format';
 import { useScan } from '@/state/scan-context';
 import { layout, radius, spacing, useAppTheme } from '@/theme';
 import type { ProductAnalysis } from '@/types/analysis';
@@ -25,10 +35,12 @@ const NUTRIENT_LEVEL_LABELS: Record<
   salt: 'salt',
 };
 
-function formatSource(source: ProductAnalysis['source']) {
-  if (source === 'combined') return 'Label photo + Open Food Facts';
-  if (source === 'label_image') return 'Label photo';
-  return 'Open Food Facts';
+function FallbackText({ children }: { children: string }) {
+  return (
+    <ThemedText muted variant="caption">
+      {children}
+    </ThemedText>
+  );
 }
 
 export default function ResultScreen() {
@@ -37,35 +49,69 @@ export default function ResultScreen() {
   const analysisData = analysis ?? DEMO_PRODUCT_ANALYSIS;
   const { colors } = useAppTheme();
 
+  const servingLine = formatServingLine(analysisData.product.brand, analysisData.product.servingSize);
+  const showQualityBanner = needsQualityBanner(
+    analysisData.verdict.value,
+    analysisData.dataQuality.confidence,
+  );
+  const missingSummary = analysisData.dataQuality.missingFields.slice(0, 3).join(', ');
+  const nutritionBasis =
+    analysisData.source === 'open_food_facts'
+      ? 'Values from the food database (usually per 100 g)'
+      : 'Values as listed on the photographed label';
+
   return (
     <Screen safeEdges={['bottom']} scroll testID="result-screen">
       <View style={styles.page}>
         <View style={styles.product}>
-          <Badge label={isDemo ? 'DEMO RESULT' : formatSource(analysisData.source)} />
+          <Badge label={isDemo ? 'DEMO RESULT' : formatSourceLabel(analysisData.source)} />
           <ThemedText accessibilityRole="header" variant="title">
             {analysisData.product.name ?? 'Unknown product'}
           </ThemedText>
-          <ThemedText muted variant="bodyStrong">
-            {[analysisData.product.brand, analysisData.product.servingSize].filter(Boolean).join(' · ')}
-          </ThemedText>
+          {servingLine ? (
+            <ThemedText muted variant="bodyStrong">
+              {servingLine}
+            </ThemedText>
+          ) : null}
         </View>
 
         <Card style={{ backgroundColor: colors.brandSoft, borderColor: colors.brand }}>
-          <Badge label={analysisData.verdict.title} tone="positive" />
+          <Badge label={analysisData.verdict.title} tone={verdictTone(analysisData.verdict.value)} />
           <ThemedText accessibilityRole="header" variant="section">
             Overall assessment
           </ThemedText>
           <ThemedText>{analysisData.verdict.shortReason}</ThemedText>
           <ThemedText muted variant="captionStrong">
-            Confidence: {analysisData.verdict.confidence}
+            Confidence: {formatConfidence(analysisData.verdict.confidence)}
           </ThemedText>
         </Card>
 
+        {showQualityBanner ? (
+          <Card>
+            <Badge label="Limited label data" tone="concern" />
+            <ThemedText>
+              {analysisData.verdict.value === 'insufficient_data'
+                ? 'There was not enough readable label information for a full assessment.'
+                : 'Parts of this assessment rest on incomplete label information.'}
+            </ThemedText>
+            {missingSummary ? <FallbackText>{`Missing: ${missingSummary}${
+              analysisData.dataQuality.missingFields.length > 3 ? '…' : ''
+            }`}</FallbackText> : null}
+          </Card>
+        ) : null}
+
         <Card>
-          <SectionHeading description={`Per ${analysisData.product.servingSize ?? 'label serving'}`} title="Calories" />
+          <SectionHeading
+            description={
+              analysisData.product.servingSize
+                ? `Per ${analysisData.product.servingSize}`
+                : 'As listed on the label'
+            }
+            title="Calories"
+          />
           <View style={styles.calorieRow}>
             <ThemedText style={{ color: colors.brand }} variant="display">
-              {analysisData.calories.perServingKcal ?? '—'}
+              {formatKcal(analysisData.calories.perServingKcal)}
             </ThemedText>
             <ThemedText muted variant="bodyStrong">
               kcal per serving
@@ -73,24 +119,34 @@ export default function ResultScreen() {
           </View>
           <ThemedText muted variant="caption">
             {analysisData.calories.per100gKcal === null
-              ? 'Per 100 g value not listed'
+              ? analysisData.calories.perServingKcal === null
+                ? 'Calories not listed in the available data'
+                : 'Per 100 g value not listed'
               : `${analysisData.calories.per100gKcal} kcal per 100 g`}
           </ThemedText>
         </Card>
 
         <Card>
-          <SectionHeading description="Values shown per photographed serving" title="Nutrition" />
+          <SectionHeading description={nutritionBasis} title="Nutrition" />
           <NutritionGrid nutrition={analysisData.nutrition} />
         </Card>
 
         <Card>
           <SectionHeading title="What looks positive" />
-          <BulletList items={analysisData.positives} tone="positive" />
+          {analysisData.positives.length > 0 ? (
+            <BulletList items={analysisData.positives} tone="positive" />
+          ) : (
+            <FallbackText>Nothing notable in the available data.</FallbackText>
+          )}
         </Card>
 
         <Card>
           <SectionHeading title="What to notice" />
-          <BulletList items={analysisData.concerns} tone="concern" />
+          {analysisData.concerns.length > 0 ? (
+            <BulletList items={analysisData.concerns} tone="concern" />
+          ) : (
+            <FallbackText>No specific concerns in the available data.</FallbackText>
+          )}
         </Card>
 
         <Card style={{ borderColor: colors.allergen }}>
@@ -100,19 +156,27 @@ export default function ResultScreen() {
           />
           <View style={styles.subsection}>
             <ThemedText variant="bodyStrong">Contains</ThemedText>
-            <View style={styles.badges}>
-              {analysisData.allergens.declared.map((allergen) => (
-                <Badge key={allergen} label={allergen} tone="allergen" />
-              ))}
-            </View>
+            {analysisData.allergens.declared.length > 0 ? (
+              <View style={styles.badges}>
+                {analysisData.allergens.declared.map((allergen) => (
+                  <Badge key={allergen} label={allergen} tone="allergen" />
+                ))}
+              </View>
+            ) : (
+              <FallbackText>No declared allergens in the available data.</FallbackText>
+            )}
           </View>
           <View style={styles.subsection}>
             <ThemedText variant="bodyStrong">May contain / traces</ThemedText>
-            <View style={styles.badges}>
-              {analysisData.allergens.traces.map((allergen) => (
-                <Badge key={allergen} label={allergen} tone="concern" />
-              ))}
-            </View>
+            {analysisData.allergens.traces.length > 0 ? (
+              <View style={styles.badges}>
+                {analysisData.allergens.traces.map((allergen) => (
+                  <Badge key={allergen} label={allergen} tone="concern" />
+                ))}
+              </View>
+            ) : (
+              <FallbackText>No traces listed in the available data.</FallbackText>
+            )}
           </View>
           {analysisData.allergens.statement ? (
             <ThemedText muted variant="caption">
@@ -126,10 +190,18 @@ export default function ResultScreen() {
 
         <Card>
           <SectionHeading
-            description={`${analysisData.ingredients.items.length} ingredients parsed. Tap any row for evidence.`}
+            description={
+              analysisData.ingredients.items.length > 0
+                ? `${analysisData.ingredients.items.length} ingredients parsed. Tap any row for evidence.`
+                : 'No ingredients could be parsed from the available data.'
+            }
             title="Ingredients explained"
           />
-          <IngredientList items={analysisData.ingredients.items} />
+          {analysisData.ingredients.items.length > 0 ? (
+            <IngredientList items={analysisData.ingredients.items} />
+          ) : (
+            <FallbackText>Try a clearer photo of the ingredients panel.</FallbackText>
+          )}
           {analysisData.ingredients.rawText ? (
             <View style={[styles.rawText, { backgroundColor: colors.surfaceSubtle }]}>
               <ThemedText variant="captionStrong">As printed</ThemedText>
@@ -162,6 +234,12 @@ export default function ResultScreen() {
               ) : null,
             )}
           </View>
+          {analysisData.labelSignals.nutriScore ? (
+            <FallbackText>{nutriScoreContext(analysisData.labelSignals.nutriScore)}</FallbackText>
+          ) : null}
+          {analysisData.labelSignals.novaGroup ? (
+            <FallbackText>{novaGroupContext(analysisData.labelSignals.novaGroup)}</FallbackText>
+          ) : null}
           <View style={styles.subsection}>
             <ThemedText variant="bodyStrong">Identified additives</ThemedText>
             <ThemedText muted>
@@ -177,22 +255,30 @@ export default function ResultScreen() {
           <View style={styles.metadataRow}>
             <ThemedText muted>Source</ThemedText>
             <ThemedText style={styles.metadataValue} variant="bodyStrong">
-              {formatSource(analysisData.source)}
+              {formatSourceLabel(analysisData.source)}
             </ThemedText>
           </View>
           <View style={styles.metadataRow}>
             <ThemedText muted>Confidence</ThemedText>
             <ThemedText style={styles.metadataValue} variant="bodyStrong">
-              {analysisData.dataQuality.confidence}
+              {formatConfidence(analysisData.dataQuality.confidence)}
             </ThemedText>
           </View>
           <View style={styles.subsection}>
             <ThemedText variant="bodyStrong">Missing information</ThemedText>
-            <BulletList items={analysisData.dataQuality.missingFields} tone="neutral" />
+            {analysisData.dataQuality.missingFields.length > 0 ? (
+              <BulletList items={analysisData.dataQuality.missingFields} tone="neutral" />
+            ) : (
+              <FallbackText>None — the available data covered the key fields.</FallbackText>
+            )}
           </View>
           <View style={styles.subsection}>
             <ThemedText variant="bodyStrong">Warnings</ThemedText>
-            <BulletList items={analysisData.dataQuality.warnings} tone="neutral" />
+            {analysisData.dataQuality.warnings.length > 0 ? (
+              <BulletList items={analysisData.dataQuality.warnings} tone="neutral" />
+            ) : (
+              <FallbackText>None.</FallbackText>
+            )}
           </View>
         </Card>
 
