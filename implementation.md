@@ -29,7 +29,7 @@ If a later step reveals a defect in an earlier foundation, return to the earlier
 - [x] Step 4 — Implement barcode fast path
 - [x] Step 5 — Implement label photo capture
 - [x] Step 6 — Implement image preparation
-- [ ] Step 7 — Define normalized analysis schema
+- [x] Step 7 — Define normalized analysis schema
 - [ ] Step 8 — Build stateless server analysis endpoint
 - [ ] Step 9 — Integrate OpenRouter structured label analysis
 - [ ] Step 10 — Connect scan pipeline end-to-end
@@ -748,12 +748,24 @@ Use these fixtures to keep UI independent of network.
 
 ## Verification
 
-- [ ] valid fixture parses
-- [ ] missing required keys fail
-- [ ] invalid verdict fails
-- [ ] number where string required fails
-- [ ] unexpected AI payload can be rejected
-- [ ] result screen uses normalized model only
+- [x] valid fixture parses
+- [x] missing required keys fail
+- [x] invalid verdict fails
+- [x] number where string required fails
+- [x] unexpected AI payload can be rejected
+- [x] result screen uses normalized model only
+
+## Recorded Decisions
+
+- Runtime validator: `zod@4.5.4` via `npx expo install`. Only version-stable API used (`z.object/enum/literal/string/number/array`, `.nullable()`, `safeParse`) — no strict-mode or coercion features.
+- Single contract: `src/lib/analysis/schema.ts` exports `ProductAnalysisSchema: z.ZodType<ProductAnalysis>` so `tsc` fails if schema and `src/types/analysis.ts` drift. Unknown keys stripped, wrong types fail; numeric strings rejected, never coerced (`"250"` kcal fails).
+- `src/lib/analysis/normalize.ts`: `STANDARD_DISCLAIMER` enforced deterministically via `withStandardDisclaimer`/`normalizeProductAnalysis` (never left to model wording), plus `insufficientDataAnalysis()` builder where all unknowns stay `null`/empty.
+- Fixtures in `src/lib/analysis/fixtures.ts` (favorable oats, high-sugar snack, incomplete label, allergen peanut butter, two-photo noodles) — each `satisfies ProductAnalysis` at compile time and parse-checked at runtime. Existing `demo-fixture.ts` also parses; `result.tsx` consumes only the `ProductAnalysis` type.
+- New files use relative imports internally so the pure contract stays runnable outside the bundler for verification.
+
+## Step Status
+
+Completed on 2026-09-03. Verified: 12/12 runtime matrix checks (5 fixtures + demo parse; missing-keys/invalid-verdict/numeric-string/garbage rejected; disclaimer enforced; malformed rejected; `insufficient_data` valid), strict TypeScript, ESLint clean, Expo Doctor 21/21, web production export.
 
 ## Gate
 
