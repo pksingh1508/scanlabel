@@ -306,7 +306,7 @@ Use one stateless server endpoint in the same Expo Router project when practical
 
 Purpose:
 
-- protect the OpenAI API key,
+- protect the OpenRouter API key,
 - accept label image(s) and/or normalized Open Food Facts data,
 - extract the relevant label facts,
 - explain ingredients,
@@ -319,29 +319,43 @@ Do not intentionally log full base64 images.
 
 Use server-only environment variable:
 
-`OPENAI_API_KEY`
+`OPENROUTER_API_KEY`
+
+Keep the OpenRouter model slug in a separate server-only environment variable:
+
+`OPENROUTER_ANALYSIS_MODEL`
 
 Never expose it through `EXPO_PUBLIC_*`.
+
+All paid AI inference must be sent through OpenRouter's server-side gateway. Do not call an underlying model provider directly and do not configure provider-specific API keys or endpoints in the mobile app or server analysis service.
+
+Use either built-in server-side `fetch` or the official OpenRouter SDK. The gateway endpoint is:
+
+`POST https://openrouter.ai/api/v1/chat/completions`
 
 ## 6.5 AI model strategy
 
 Primary goal: accuracy on label extraction and low cost.
 
-Use a current OpenAI model that supports:
+Use a current model available through OpenRouter that supports:
 
 - image input,
 - text input,
 - structured output / JSON schema.
 
+Verify these capabilities against the current OpenRouter model metadata before selecting the model. When requesting structured output, use `response_format.type = "json_schema"`, strict mode, and OpenRouter provider routing with `require_parameters: true` so the request is not routed to an endpoint that lacks required parameters.
+
 For cost-sensitive production traffic, prefer the current cost-efficient vision-capable model unless evaluation shows unacceptable extraction quality.
 
 A stronger model may be used as a fallback for difficult labels.
 
-Do not hard-code assumptions about a model forever. Keep the model ID in a server-side environment/config constant so it can be changed without redesigning the app.
+Do not hard-code assumptions about a model forever. Keep the OpenRouter model slug in server-side environment/config so it can be changed without redesigning the app.
+
+The application must remain provider-agnostic behind the OpenRouter gateway. It may change the selected model or underlying provider without changing the mobile client or normalized result schema.
 
 ## 6.6 Why server-side AI is required
 
-A mobile app cannot safely contain the OpenAI API key.
+A mobile app cannot safely contain the OpenRouter API key.
 
 The server route may be completely stateless and still satisfy the product requirement of:
 
@@ -847,10 +861,12 @@ For MVP:
 - validate JSON,
 - cap output size,
 - enforce server timeout,
-- use OpenAI project budget/rate limits,
+- use OpenRouter API-key spend limits, privacy controls, and provider-routing controls,
 - use hosting-provider rate limiting/WAF where available,
 - return generic server errors,
 - do not expose provider errors or secrets.
+
+OpenRouter forwards requests to an underlying model provider, whose retention policy may differ. Before production, disable optional prompt/completion logging, deny providers that may collect data where supported, and verify the selected route's current retention/training policy. Prefer Zero Data Retention routing when it is compatible with the chosen model and reliability requirements.
 
 Do not rely on a secret hard-coded in the mobile application. Attackers can extract it.
 
@@ -1111,11 +1127,21 @@ https://openfoodfacts.github.io/documentation/docs/Product-Opener/api/explain-pr
 ## Open Food Facts licensing
 https://openfoodfacts.github.io/documentation/docs/Product-Opener/api/tutorials/license-be-on-the-legal-side/
 
-## OpenAI API quickstart / image inputs
-https://platform.openai.com/docs/quickstart
+## OpenRouter quickstart / authentication
+https://openrouter.ai/docs/quickstart
 
-## OpenAI API key safety
-https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety
+## OpenRouter image inputs
+https://openrouter.ai/docs/guides/overview/multimodal/image-understanding
+
+## OpenRouter structured outputs
+https://openrouter.ai/docs/guides/features/structured-outputs
+
+## OpenRouter provider routing and parameter enforcement
+https://openrouter.ai/docs/guides/routing/provider-selection
+
+## OpenRouter data collection and provider retention
+https://openrouter.ai/docs/guides/privacy/data-collection
+https://openrouter.ai/docs/guides/privacy/provider-logging
 
 ---
 

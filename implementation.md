@@ -31,7 +31,7 @@ If a later step reveals a defect in an earlier foundation, return to the earlier
 - [ ] Step 6 — Implement image preparation
 - [ ] Step 7 — Define normalized analysis schema
 - [ ] Step 8 — Build stateless server analysis endpoint
-- [ ] Step 9 — Integrate OpenAI structured label analysis
+- [ ] Step 9 — Integrate OpenRouter structured label analysis
 - [ ] Step 10 — Connect scan pipeline end-to-end
 - [ ] Step 11 — Build production result UI
 - [ ] Step 12 — Add reliability, privacy, and abuse protection
@@ -102,7 +102,7 @@ npx expo install expo-image-manipulator
 npx expo install react-native-safe-area-context
 ```
 
-Install OpenAI server dependency only when Step 8/9 starts.
+Do not install a direct model-provider SDK. At Step 8/9, use server-side `fetch` or install the official OpenRouter SDK only if it materially simplifies the implementation.
 
 ## Configuration
 
@@ -708,18 +708,22 @@ Use EAS Hosting or another supported provider.
 Server only:
 
 ```text
-OPENAI_API_KEY=
-OPENAI_ANALYSIS_MODEL=
+OPENROUTER_API_KEY=
+OPENROUTER_ANALYSIS_MODEL=
 ```
 
 Optional:
 
 ```text
+OPENROUTER_SITE_URL=
+OPENROUTER_APP_NAME=
 ANALYSIS_MAX_IMAGES=2
 ANALYSIS_TIMEOUT_MS=30000
 ```
 
 Do not prefix secrets with `EXPO_PUBLIC_`.
+
+Keep `https://openrouter.ai/api/v1` as a server-side constant. Do not accept an arbitrary gateway base URL from the mobile request.
 
 ## Request contract
 
@@ -779,8 +783,8 @@ Do not log:
 - image base64
 - full label text
 - API key
-- full OpenAI request payload
-- full OpenAI response in production
+- full OpenRouter request payload
+- full OpenRouter response in production
 
 ## Verification
 
@@ -803,7 +807,7 @@ Step 8 passes when the mobile app can securely call a stateless mock analysis ro
 
 ---
 
-# Step 9 — Integrate OpenAI Structured Label Analysis
+# Step 9 — Integrate OpenRouter Structured Label Analysis
 
 ## Goal
 
@@ -811,7 +815,14 @@ Replace mock analysis with real multimodal structured analysis.
 
 ## API
 
-Use the current OpenAI Responses API.
+Send requests only from the stateless server route to OpenRouter:
+
+```text
+POST https://openrouter.ai/api/v1/chat/completions
+Authorization: Bearer $OPENROUTER_API_KEY
+```
+
+Use built-in server-side `fetch` or the official OpenRouter SDK. Do not call an underlying model provider directly. Optional `HTTP-Referer` and `X-OpenRouter-Title` headers may be populated from server-only app metadata for OpenRouter attribution.
 
 Send:
 
@@ -825,10 +836,10 @@ Send:
 Set through:
 
 ```text
-OPENAI_ANALYSIS_MODEL
+OPENROUTER_ANALYSIS_MODEL
 ```
 
-Choose a current vision-capable cost-efficient model initially.
+Choose a current cost-efficient OpenRouter model whose metadata confirms both image input and structured-output support. Model slugs are OpenRouter identifiers, such as `provider/model`; do not assume a specific provider in application code.
 
 Do not couple application code to one forever-fixed model.
 
@@ -862,6 +873,8 @@ Provide:
 ## Structured output
 
 Use strict JSON schema / structured output support.
+
+For OpenRouter Chat Completions, send `response_format.type = "json_schema"` with `strict: true`. Set `provider.require_parameters = true` so OpenRouter only selects endpoints that support the requested parameters.
 
 Do not ask the model for free-form markdown and then regex parse it.
 
@@ -1176,10 +1189,11 @@ Make the MVP safe enough for public testing.
 
 ## Cost controls
 
-Configure through OpenAI/hosting dashboards where available:
+Configure through OpenRouter and hosting dashboards where available:
 
-- budget alert
-- project usage limit
+- OpenRouter API-key spend limit
+- OpenRouter usage/budget monitoring
+- provider data-collection policy and, where compatible, Zero Data Retention routing
 - rate limit
 - hosting WAF/rate limit
 
@@ -1222,7 +1236,8 @@ Add appropriate attribution/license notice based on current Open Food Facts reus
 
 Perform a privacy-oriented code review:
 
-- search repository for `OPENAI_API_KEY`
+- search repository for `OPENROUTER_API_KEY`
+- search repository for direct model-provider URLs or keys
 - search for `EXPO_PUBLIC`
 - search for logging of base64
 - inspect production request logs
@@ -1469,11 +1484,11 @@ For the MVP, sending one/two compressed label images through a secure server-sid
 
 If AI image cost becomes significant later, on-device OCR can be evaluated as an optimization without changing the normalized result schema.
 
-## Why not put OpenAI directly in React Native?
+## Why use OpenRouter only from the server?
 
 Because client-side API keys can be extracted from mobile applications.
 
-The stateless server route is mandatory for a paid secret.
+The stateless server route is mandatory for the paid OpenRouter secret. All model inference goes through the OpenRouter gateway; the client never calls OpenRouter or an underlying provider directly.
 
 ## Why no "Eat / Don't eat" binary?
 
@@ -1516,8 +1531,24 @@ https://openfoodfacts.github.io/documentation/docs/Product-Opener/api/explain-pr
 Open Food Facts licensing  
 https://openfoodfacts.github.io/documentation/docs/Product-Opener/api/tutorials/license-be-on-the-legal-side/
 
-OpenAI quickstart and image input  
-https://platform.openai.com/docs/quickstart
+OpenRouter quickstart and authentication
 
-OpenAI key safety  
-https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety
+https://openrouter.ai/docs/quickstart
+
+OpenRouter image inputs
+
+https://openrouter.ai/docs/guides/overview/multimodal/image-understanding
+
+OpenRouter structured outputs
+
+https://openrouter.ai/docs/guides/features/structured-outputs
+
+OpenRouter provider routing
+
+https://openrouter.ai/docs/guides/routing/provider-selection
+
+OpenRouter data collection and provider logging
+
+https://openrouter.ai/docs/guides/privacy/data-collection
+
+https://openrouter.ai/docs/guides/privacy/provider-logging
