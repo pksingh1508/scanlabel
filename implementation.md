@@ -1614,6 +1614,21 @@ On store-like production builds:
 
 Step 14 passes when both platform builds and the production analysis endpoint work together reliably.
 
+## Recorded Decisions
+
+- Executable part completed 2026-09-03 without accounts/devices: `eas.json` created with `development` (dev client, internal), `preview` (internal), and `production` profiles. No `projectId` yet — it is minted by owner-run `eas init` against the owner's Expo account, so it is deliberately absent.
+- Static release prerequisites verified in-repo: Android package `com.pawankumar.scanlabel` + iOS bundle id match the Step 1 contract; camera permission copy present with microphone explicitly disabled; app icon + adaptive-icon assets exist; zero dev endpoints in `src` (relative `/api/analyze` only); store-copy grep clean — the only "diagnose" hits are explicit anti-claims ("does not diagnose", "never diagnose"); no auth/DB/history/tracking code.
+- Approved store-description wording (safe per contract): "Scan packaged-food labels to understand ingredients, calories, nutrition facts, and general nutrition considerations."
+- Data-safety answers supported by construction: no account, no database, no scan history, camera-only permission, transient label images, Open Food Facts + OpenRouter (server-side) as the only network destinations.
+
+## Step Status
+
+Blocked on owner accounts, devices, and hosting (see Blocker). Typecheck/lint/doctor 21/21 and production export pass with `eas.json` present.
+
+## Blocker
+
+Everything left needs the repository owner: Expo account + `eas init` (projectId) + EAS builds, Apple/Google developer accounts, store screenshots/listings/age-rating/privacy answers, server deployment (EAS Hosting or equivalent) with HTTPS + server-side env (`OPENROUTER_API_KEY`, `OPENROUTER_ANALYSIS_MODEL`, budgets/rate limits), then the full production smoke list (fresh install, first permission, barcode/direct/two-photo scans, result, scan-another, offline + timeout behavior, about screen, no-auth/no-DB) on store-like builds over the production endpoint. That pass also clears the Step 9/10/13 blockers (funded key + hardware).
+
 ---
 
 # Post-MVP Backlog — DO NOT IMPLEMENT DURING MVP
