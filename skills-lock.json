@@ -1,11 +1,35 @@
 {
   "version": 1,
   "skills": {
+    "expo-design-system": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "skillPath": "plugins/expo/skills/expo-design-system/SKILL.md",
+      "computedHash": "9cd97e006b56c119daf8c7fca547986d702793608571dfda248f003355f5aff9"
+    },
+    "expo-liquid-glass": {
+      "source": "devanshudesai/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/expo-liquid-glass/SKILL.md",
+      "computedHash": "54e019fbdcf965286d9eda859cc30376d53e0ea22d9b41384044e9a787599265"
+    },
     "expo-ui": {
       "source": "expo/skills",
       "sourceType": "github",
       "skillPath": "plugins/expo/skills/expo-ui/SKILL.md",
       "computedHash": "0e3b343c6e60acab6f4fd4ae6364973f3641ee6de609f3e469bf0347302ead9e"
+    },
+    "ios-animation-design": {
+      "source": "existential-birds/beagle",
+      "sourceType": "github",
+      "skillPath": "plugins/beagle-ios/skills/ios-animation-design/SKILL.md",
+      "computedHash": "04d8c334c1cc415352c66bfb21da1987b1a61fbc4afdd9cd9bcbe1c6b7d5f8f1"
+    },
+    "react-native-animations": {
+      "source": "pluginagentmarketplace/custom-plugin-react-native",
+      "sourceType": "github",
+      "skillPath": "skills/react-native-animations/SKILL.md",
+      "computedHash": "3b336655ba72cc1593fb5124f2e02c19a4e19fe3aaa43d3ce245e719f1c8a33e"
     }
   }
 }
