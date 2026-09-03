@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { BrandMark } from '@/components/scanner/BrandMark';
-import { ScannerPreview } from '@/components/scanner/ScannerPreview';
+import { CameraScanner } from '@/components/scanner/CameraScanner';
 import { Button } from '@/components/ui/Button';
 import { Screen } from '@/components/ui/Screen';
 import { ThemedText } from '@/components/ui/ThemedText';
@@ -31,7 +31,7 @@ export default function HomeScreen() {
         </ThemedText>
       </View>
 
-      <ScannerPreview />
+      <CameraScanner />
 
       <View style={styles.actions}>
         <ThemedText style={styles.centered} variant="bodyStrong">

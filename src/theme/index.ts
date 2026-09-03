@@ -14,6 +14,8 @@ const sharedColors = {
   cameraSurface: '#14231E',
   cameraGuide: '#D5F5E3',
   cameraText: '#F6FAF8',
+  cameraMutedText: '#C5D1CA',
+  cameraOverlay: 'rgba(8, 18, 13, 0.78)',
   transparent: 'transparent',
 } as const;
 
@@ -88,6 +90,7 @@ export const layout = {
   cameraAspectRatio: 1.15,
   borderWidth: 1,
   guideBorderWidth: 2,
+  cameraControlInset: 12,
 } as const;
 
 export const motion = {

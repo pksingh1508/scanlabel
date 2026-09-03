@@ -311,17 +311,17 @@ Replace the static scanner with the real device camera.
 
 ## Tasks
 
-- [ ] request camera permission
-- [ ] handle `granted`
-- [ ] handle `denied`
-- [ ] handle permission not yet determined
-- [ ] render `CameraView`
-- [ ] use back camera
-- [ ] implement torch toggle if useful
-- [ ] display scan guide overlay
-- [ ] pause/deactivate camera when screen loses focus
-- [ ] avoid microphone permission
-- [ ] add accessible labels to camera controls
+- [x] request camera permission
+- [x] handle `granted`
+- [x] handle `denied`
+- [x] handle permission not yet determined
+- [x] render `CameraView`
+- [x] use back camera
+- [x] implement torch toggle if useful
+- [x] display scan guide overlay
+- [x] pause/deactivate camera when screen loses focus
+- [x] avoid microphone permission
+- [x] add accessible labels to camera controls
 
 ## Barcode types
 
@@ -364,6 +364,16 @@ On a real device:
 - [ ] barcode callback fires
 - [ ] repeated frames do not trigger duplicate actions
 - [ ] leaving the screen stops unnecessary camera work
+
+## Step Status
+
+Implementation finished on 2026-09-03; the real-device verification gate is still pending. The scanner requests camera access on the home route, handles loading/granted/denied/settings and camera-mount failure states, uses the back camera, supports an accessible torch control, scans EAN-13/EAN-8/UPC-A/UPC-E, unmounts the camera whenever the route or app is inactive, and locks immediately after the first barcode until an explicit retry or route return. No microphone API is used and the Expo camera plugin continues to disable microphone permission/recording.
+
+Strict TypeScript, ESLint, Expo Doctor (21/21), the deterministic scan-lock check, and Android/iOS/web production exports pass. The iOS simulator displayed the expected system permission prompt and configured permission copy. No physical Android or iOS device is attached to this development machine, so camera preview, denial UX, live barcode callbacks, and focus deactivation cannot yet be truthfully checked under the required real-device heading.
+
+## Blocker
+
+Connect a physical Android or iOS device and exercise the six verification items above. Do not mark Step 3 complete or begin Step 4 until those hardware checks pass.
 
 ## Gate
 
